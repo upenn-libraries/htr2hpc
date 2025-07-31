@@ -2,10 +2,11 @@
 
 H2H (htr2hpc) has three components:
 
-– A replacement for eScriptorium's login that uses Princeton's authentication
-– Training components:
-    – Tasks that replace the eScriptorium celery tasks so that training jobs are sent to the GPC
-    – A python script that runs on the GPC (see src/htr2hpc/train/README.md) that constructs the keto training command and communicates with eScriptorium
+- A replacement for eScriptorium's login that uses Princeton's authentication
+
+- Training components:
+    - Tasks that replace the eScriptorium celery tasks so that training jobs are sent to the GPC
+    - A python script that runs on the GPC (see src/htr2hpc/train/README.md) that constructs the keto training command and communicates with eScriptorium
 
 We are not using the first of these, the login replacement. Instead, we'll use local accounts.
 
