@@ -22,14 +22,14 @@ The `segtrain` and `train` methods construct the command that is sent to the `ht
 
 ## Training: `htr2hpc.train`, `src/htr2hpc/train`
 
-The `htr2hpc-train` script constructs the Ketos training command that is run on the GPC (`src/htr2hpc/train/run.py`, `src/htr2hpc/train/slurm.py`). It also communicates with eScriptorium via an API class (see `src/htr2hpc/api_client.py`). The API:
+The `htr2hpc-train` script constructs, runs, and monitors the Ketos training commands that are run on the GPC (see `src/htr2hpc/train/run.py`, `src/htr2hpc/train/slurm.py`). It also communicates status with and sends updates to eScriptorium via a custom API (see `src/htr2hpc/api_client.py`). The API:
 
 - Manages changes to application models (i.e., Document, ML Model, Task)
 - Requests document information (document list and document details, lists of images, etc.)
 - Downloads files (models, ground truth, images)
 - Updates eScriptorium with task status information
 
-The `htr2hpc.train.run.main()` function defines the parameters and options of the `htr2hpc-train` command. The work itself is handled by the `htr2hpc.train.run.TrainingManager` class. Its `segmentation_training` and `recognition_training` methods call the `htr2hpc.train.slurm` `segtrain` and `recognition_train` functions, which construct the Slurm jobs with the commands needed to set up the Slurm environment and construct the Ketos training command. See below for more on HPC GPC and Slurm.
+The `htr2hpc.train.run.main()` function defines the parameters and options of the `htr2hpc-train` command. The work itself is handled by the `htr2hpc.train.run.TrainingManager` class. Its `segmentation_training` and `recognition_training` methods call the `htr2hpc.train.slurm` `segtrain` and `recognition_train` functions. The setup and configure the Slurm jobs and build the Ketos training commands. See below for more on HPC GPC and Slurm.
 
 ## Training Workflow Details
 
@@ -49,21 +49,21 @@ success = start_remote_training(
 )
 ```
 
-`start_remote_training()`:
+Specifically `start_remote_training()`:
 
 - Establishes the SSH connection with the GPC, logging in as the eScriptorium user (see the Changes section below)
 - Changes to the `working_dir`
-- Loads the `conda` module (`miniforge3` for UPenn)
-- Runs the `htr2hpc-train` command
 - Sets the `ESCRIPTORIUM_API_TOKEN` environment variable used by `htr2hpc-train` to communicate with eScriptorium
+- Loads the `conda` module (`miniforge3` for UPenn) and activates the `htr2hpc` environment
+- Runs the `htr2hpc-train` command
 
 ### `htr2hpc-train` Training Workflow
 
 #### `htr2hpc.train.run`
 
-The work of `htr2hpc-train` is done in the `htr2hpc.train.run` module. Its main method parses the command line arguments, creates an `htr2hpc.train.TrainingManager` instance (`training_mgr`), and calls `training_mgr.training_prep` to retrieve training data (images, model, etc.). It then runs either `training_mgr.segmentation_training()` or `training_mgr.recognition_training()`, based on the CLI subcommand.
+The work of `htr2hpc-train` is done in the `htr2hpc.train.run` module. Its main method parses the command line arguments, creates an `htr2hpc.train.TrainingManager` instance (`training_mgr`), and calls `training_mgr.training_prep`, which retrieves the training data from eScriptorium (images, model, etc.). It then runs either `training_mgr.segmentation_training()` or `training_mgr.recognition_training()`, based on the CLI subcommand.
 
-The training methods assemble Slurm job parameters, paths, and resource estimates and call `htr2hpc.train.slurm.segtrain()` or `htr2hpc.train.slurm.recognition_train()`, which returns the Slurm job ID.>
+The training methods assemble Slurm job parameters, paths, and resource estimates and call `htr2hpc.train.slurm.segtrain()` or `htr2hpc.train.slurm.recognition_train()`, which returns the Slurm job ID.
 
 When the job has started `training_mgr` calls `self.monitor_slurm_job(job_id)`.
 
@@ -71,7 +71,7 @@ When the job has started `training_mgr` calls `self.monitor_slurm_job(job_id)`.
 
 #### `htr2hpc.train.slurm`
 
-`htr2hpc.train.slurm` uses the `simple_slurm` python module (https://github.com/amq92/simple_slurm). The functions `segtrain()` and `recognition_train()` setup and enqueue the Slurm batch job. Setup includes the Slurm job parameters (nodes, cpus_per_task, GPU spec, etc.; see below for details), commands to load the HTR2HPC environment, and the full `ketos` command.
+`htr2hpc.train.slurm` uses the `simple_slurm` python module (https://github.com/amq92/simple_slurm). The functions `segtrain()` and `recognition_train()` set up and enqueue the Slurm batch job. Setup includes the Slurm job parameters (nodes, cpus_per_task, GPU spec, etc.; see below for details), commands to load the HTR2HPC environment, and the full `ketos` command.
 
 `segtrain()` and `recognition_train()` queue the Slurm batch and return the job ID:
 
@@ -93,8 +93,6 @@ recogtrain_slurm = Slurm(
     job_name=f"{prelim_opt}train:{output_model.name}",
     output=f"train_{Slurm.JOB_ARRAY_MASTER_ID}.out",
     time=training_time,
-    partition="low",
-    qos="low",
 )
 ```
 
@@ -121,11 +119,7 @@ UPenn SAS HPC requires specifying partition and quality of service (see HPC GPC2
 -p, --partition=partition   partition requested
 ```
 
-For SAS's GPC we should use `--qos=low --partition=low`. See below for information about QOS and partitions and SAS HPC guidance.
-
-**Quality of Service:** From the Slurm documentation (https://slurm.schedmd.com/qos.html), quality of service:
-
-> will affect the job in three key ways: scheduling priority, preemption, and resource limits.
+For SAS's GPC we should use `--qos=low --partition=low`. 
 
 ## Changes to htr2hpc-train for SAS HPC GPC2
 
@@ -138,13 +132,15 @@ For SAS's GPC we should use `--qos=low --partition=low`. See below for informati
 
 ## Slurm QOS and partitions
 
+**Quality of Service:** From the Slurm documentation (https://slurm.schedmd.com/qos.html), quality of service:
+
+> will affect the job in three key ways: scheduling priority, preemption, and resource limits.
+
 **Partition:** A Slurm cluster consists of nodes grouped under partitions. From the Slurm Quick Start guide (https://slurm.schedmd.com/quickstart.html):
 
 > The partitions can be considered job queues, each of which has an assortment of constraints such as job size limit, job time limit, users permitted to use it, etc.
 
 The `sinfo` command shows summary information about cluster partitions and nodes. The `squeue` command shows detailed information about jobs, the partitions and nodes they are running on.
-
-
 
 ## HPC GPC2 and Slurm
 
