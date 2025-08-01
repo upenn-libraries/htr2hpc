@@ -52,19 +52,28 @@ success = start_remote_training(
 `start_remote_training()`:
 
 - Establishes the SSH connection with the GPC, logging in as the eScriptorium user (see the Changes section below)
-- Changes to the `working_dir`, loads the `conda` module (`miniforge3` for UPenn)
+- Changes to the `working_dir`
+- Loads the `conda` module (`miniforge3` for UPenn)
 - Runs the `htr2hpc-train` command
 - Sets the `ESCRIPTORIUM_API_TOKEN` environment variable used by `htr2hpc-train` to communicate with eScriptorium
 
 ### `htr2hpc-train` Training Workflow
 
+#### `htr2hpc.train.run`
+
 The work of `htr2hpc-train` is done in the `htr2hpc.train.run` module. Its main method parses the command line arguments, creates an `htr2hpc.train.TrainingManager` instance (`training_mgr`), and calls `training_mgr.training_prep` to retrieve training data (images, model, etc.). It then runs either `training_mgr.segmentation_training()` or `training_mgr.recognition_training()`, based on the CLI subcommand.
 
-The training methods assemble Slurm job parameters, paths, and resource estimates. The training function calls `htr2hpc.train.slurm.segtrain()` or `htr2hpc.train.slurm.recognition_train()`, which returns the Slurm job ID, and then `self.monitor_slurm_job(job_id)`.
+The training methods assemble Slurm job parameters, paths, and resource estimates and call `htr2hpc.train.slurm.segtrain()` or `htr2hpc.train.slurm.recognition_train()`, which returns the Slurm job ID.>
+
+When the job has started `training_mgr` calls `self.monitor_slurm_job(job_id)`.
 
 `monitor_slurm_job()` communicates job status information to eScriptorium via the `htr2hpc.api_client.eScriptoriumAPIClient` instance. It relies on `htr2hpc.train.slurm` functions that query job queue status, job status, and job stats.
 
-`htr2hpc.train.slurm` uses the `simple_slurm` module (https://github.com/amq92/simple_slurm). The functions `segtrain()` and `recognition_train()` construct and enqueue the Slurm batch job. Setup includes the Slurm job parameters (nodes, cpus_per_task, GPU spec, etc.; see below for details), commands to load the HTR2HPC environment, and the `ketos` command. The training functions queue the Slurm batch and return the job ID:
+#### `htr2hpc.train.slurm`
+
+`htr2hpc.train.slurm` uses the `simple_slurm` python module (https://github.com/amq92/simple_slurm). The functions `segtrain()` and `recognition_train()` setup and enqueue the Slurm batch job. Setup includes the Slurm job parameters (nodes, cpus_per_task, GPU spec, etc.; see below for details), commands to load the HTR2HPC environment, and the full `ketos` command.
+
+`segtrain()` and `recognition_train()` queue the Slurm batch and return the job ID:
 
 ```python
 return segtrain_slurm.sbatch(segtrain_cmd)
