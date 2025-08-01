@@ -39,6 +39,8 @@ def segtrain(
         job_name=f"{prelim_opt}segtrain:{output_model.name}",
         output=f"segtrain_{Slurm.JOB_ARRAY_MASTER_ID}.out",
         time=training_time,
+        partition="low",
+        qos="low",
     )
     # do we want to use CUDA Multi-Process Service (MPS) ?
     # della documentation says to specify with --gpu-mps,
@@ -92,6 +94,8 @@ def recognition_train(
         job_name=f"{prelim_opt}train:{output_model.name}",
         output=f"train_{Slurm.JOB_ARRAY_MASTER_ID}.out",
         time=training_time,
+        partition="low",
+        qos="low",
     )
     recogtrain_slurm.add_cmd("module purge")
     recogtrain_slurm.add_cmd("module load miniforge3/24.11.3")
