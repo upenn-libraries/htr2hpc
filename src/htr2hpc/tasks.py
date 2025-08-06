@@ -136,7 +136,6 @@ def segtrain(
     user_pk=None,
     **kwargs,
 ):
-    raise "Running segtrain form htr2hpc tasks.py"
     # NOTE: when called from the web ui, the SegTrainForm includes
     # a field for model_name but that value is not passed to the celery task
     # HOWEVER: when a model name is specified, the form process method
@@ -202,6 +201,7 @@ def segtrain(
     # generate the command to run
     site = Site.objects.get(pk=settings.SITE_ID)
     site_url = site.domain
+    raise f"The site domain is {site.domain}"
     if not site_url.startswith("http"):
         site_url = f"https://{site_url}"
 
@@ -366,6 +366,8 @@ def train(
 
     site = Site.objects.get(pk=settings.SITE_ID)
     site_url = site.domain
+    raise f"The site domain is {site.domain}"
+
     if not site_url.startswith("http"):
         site_url = f"https://{site_url}"
 
