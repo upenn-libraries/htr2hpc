@@ -9,6 +9,18 @@ HTR2HPC (htr2hpc) has three components:
 
 We are not using the first of these, the login replacement. Instead, we'll use local accounts.
 
+## Changes to htr2hpc-train for SAS HPC GPC2
+
+- GitHub URLs are changed to point to the Penn repository for HTR2HPC:
+  - https://github.com/upenn-libraries/htr2hpc.git
+- The module load names have been changed from `anaconda3` to `miniforge3`
+- The `htr2hpc-train` Slurm job constructor has been modified to specify `--qos` and `--partition`
+- Remote GPC working directory has been added as a setting `settings.HPC_WORKING_DIR`, and defaults to `${HOME}/htr2hpc`. HTR2HPC uses `/scratch` for its working directory; e.g., `working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"`. As of yet, scratch is not writable on GPC2. 
+- HTR2HPC connects to the GPC using the username of the currently logged-in user. We're going to use a single account
+- The remote command in `htr2hpc.tasks.start_remote_training()` has been changed to invoke a bash login shell so that Slurm environment tools are available. It's been changed:
+  - from  `f"module load anaconda3/2024.6 && conda run -n htr2hpc {train_cmd}" `
+  - to ` f'bash -l -c "module load miniforge3/24.11.3 && conda run -n htr2hpc {train_cmd}"'`
+
 ## Tasks
 
 The HTR2HPC deploy process rewrites the eScriptorium celery `tasks.py` file so that:
@@ -51,7 +63,7 @@ success = start_remote_training(
 
 Specifically `start_remote_training()`:
 
-- Establishes the SSH connection with the GPC, logging in as the eScriptorium user (see the Changes section below)
+- Establishes the SSH connection with the GPC, logging in as the eScriptorium user (see the Changes section above)
 - Changes to the `working_dir`
 - Sets the `ESCRIPTORIUM_API_TOKEN` environment variable used by `htr2hpc-train` to communicate with eScriptorium
 - Loads the `conda` module (`miniforge3` for UPenn) and activates the `htr2hpc` environment
@@ -120,15 +132,6 @@ UPenn SAS HPC requires specifying partition and quality of service (see HPC GPC2
 ```
 
 For SAS's GPC we should use `--qos=low --partition=low`. 
-
-## Changes to htr2hpc-train for SAS HPC GPC2
-
-- GitHub URLs are changed to point to the Penn repository for HTR2HPC:
-  - https://github.com/upenn-libraries/htr2hpc.git
-- The module load names have been changed from `anaconda3` to `miniforge3`
-- The `htr2hpc-train` Slurm job constructor has been modified to specify `--qos` and `--partition`
-- HTR2HPC uses `/scratch` for its working directory; e.g., `working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"`. As of yet, scratch is not writable on GPC2. It's present on the `low` partition compute nodes, but is not writable. The `/scratch` directory has not been checked on the `gpc2_compute` partition
-- HTR2HPC connects to the GPC using the username of the currently logged-in user. We're going to use a single account
 
 ## Slurm QOS and partitions
 
