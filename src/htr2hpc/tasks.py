@@ -65,9 +65,9 @@ def start_remote_training(
             )
 
             with conn.cd(working_dir):
-                # TODO:
+                # NOTE: SAS GPC2 requires the login env for the module command; we have to run 'bash -l -c "..."'
                 result = conn.run(
-                    f"module load miniforge3/24.11.3 && conda run -n htr2hpc {train_cmd}",
+                    f'bash -l -c "module load miniforge3/24.11.3 && conda run -n htr2hpc {train_cmd}"',
                     env={"ESCRIPTORIUM_API_TOKEN": api_token},
                     warn=True,  # don't throw unexpected error on exit != 0
                 )
@@ -193,7 +193,8 @@ def segtrain(
 
     # create a name for an output directory based on mode and document id
     # TODO: change for SAS GPC fs
-    working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"
+    # working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"
+    working_dir = settings.HPC_WORKING_DIR if settings.HPC_WORKING_DIR else "${HOME}/htr2hpc"
     # includes a timestamp to ensure uniqueness, since
     # script will fail if there is an existing directory
     outdir = f"segtrain_doc{document_pk}_{directory_timestamp()}"
@@ -322,7 +323,7 @@ def train(
         return
 
     # create a name for an output directory based on mode and document id
-    working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"
+    working_dir = settings.HPC_WORKING_DIR if settings.HPC_WORKING_DIR else "${HOME}/htr2hpc"
     # create a name for an output directory based on mode and transcripiton id
     # include a timestamp to ensure uniqueness, since
     # script will fail if there is an existing directory
