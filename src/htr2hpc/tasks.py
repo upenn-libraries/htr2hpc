@@ -201,7 +201,6 @@ def segtrain(
     # generate the command to run
     site = Site.objects.get(pk=settings.SITE_ID)
     site_url = site.domain
-    raise f"The site domain is {site.domain}"
     if not site_url.startswith("http"):
         site_url = f"https://{site_url}"
 
@@ -366,7 +365,6 @@ def train(
 
     site = Site.objects.get(pk=settings.SITE_ID)
     site_url = site.domain
-    raise f"The site domain is {site.domain}"
 
     if not site_url.startswith("http"):
         site_url = f"https://{site_url}"
