@@ -1,21 +1,29 @@
-# PennLib eScriptorium
+# htr2hpc docker
 
-PennLib eScriptorium is a dockerized version of eScriptorium that includes the Penn Libraries fork of the Princeton CDH htr2hpc module.
+Penn Libraries' htr2hpc a Dockerfile and development docker-compose.yml for an eScriptorium instance with htr2hpc.
 
-For more details see:
-
-- [Princeton CDH htr2hpc](https://github.com/Princeton-CDH/htr2hpc)
-- [UPenn fork of htr2hpc](https://github.com/upenn-libraries/htr2hpc)
+The Dockerfile and docker compose configuration automate the installation steps in the [README](README.md) and [Princeton CDH's Ansible playbook](https://github.com/Princeton-CDH/cdh-ansible/blob/main/playbooks/escriptorium.yml).
 
 ## Quickstart
 
-Copy `variables.env_example` to `variables.env` and edit it to match your environment.
+Copy `variables.env_example` to `variables.env` and edit it to match your environment. See "Configuration variables" for more information.
 
 ```bash
 cp  variables.env_example variables.env
 ```
 
-The build and run:
+Create an SSH key and add the public key to the `${HOME}/.ssh/authorized_keys` file on the HPC cluster. See
+
+```bash
+$ mkdir ssh
+$ ssh-keygen -N "" -f ./ssh/htr2hpc_id_rsa -t rsa -b 4096
+$ ls ssh
+htr2hpc_id_rsa     htr2hpc_id_rsa.pub
+```
+
+Add the `./ssh/htr2hpc_id_rsa.pub` public key to the `${HOME}/.ssh/authorized_keys` file on the HPC cluster. See "SSH key authentication" below for more information.
+
+Then build and run:
 
 ```bash
 docker compose build --no-cache
@@ -26,9 +34,6 @@ docker compose up
 
 eScriptorium should be available at http://localhost:8080. Use the admin
 username and password from `variables.env`.
-
-WARNING: Do not attempt to train models. The htr2hpc module has not been updated
-to work with Penn the SAS HPC GPC.
 
 ### To clear everything out and start over:
 
@@ -44,6 +49,32 @@ Or, if you prefer one line:
 ```bash
 docker compose down && docker volume rm $(docker volume ls -q -f name=pennlib-escriptorium) && docker compose build --no-cache && docker compose up
 ```
+
+## Configuration variables
+
+For development, most of the variables can be left as is. You will want to change the following to match your environment:
+
+```shell
+ESCRIPTORIUM_HOST=example.com  # The host escriptorium is running on
+HPC_HOSTNAME=hpc.host.edu      # The hostname of the HPC cluster
+```
+
+## SSH key authentication
+
+htr2hpc relies on ssh secure authentication to run slurm jobs on the HCP cluster.
+
+The docker compose dev deployment uses docker secrets to store the ssh key on the server. The key is expected to be at `./ssh/htr2hpc_id_rsa`:
+
+```
+# docker-compose.yml
+secrets:
+  ssh_key:
+    file: ./ssh/htr2hpc_id_rsa
+```
+
+_**IMPORTANT: Do not check the ssh key into version control!**_
+
+The directory `./ssh` is in the `.gitignore` file and, thus, will ignored by git commands. If you put the ssh key in another directory in this project, make sure it is not checked into version control.
 
 ## What this repository does
 
