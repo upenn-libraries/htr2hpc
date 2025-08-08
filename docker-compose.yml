@@ -5,9 +5,9 @@ x-app:
   image: pennlib-escriptorium:latest
   build:
     context: .
+    dockerfile: ./Dockerfile.dev
   env_file: variables.env
   volumes:
-    # - ./app/:/usr/src/app/
     - static:/usr/src/app/static
     - media:/usr/src/app/media
   command: /bin/true
