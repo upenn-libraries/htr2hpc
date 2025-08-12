@@ -39,7 +39,7 @@ username and password from `variables.env`.
 
 ```bash
 docker compose down
-docker volume rm $(docker volume ls -q -f name=pennlib-escriptorium)
+docker volume rm $(docker volume ls -q -f name=htr2hpc)
 docker compose build --no-cache
 docker compose up
 ```
@@ -47,7 +47,7 @@ docker compose up
 Or, if you prefer one line:
 
 ```bash
-docker compose down && docker volume rm $(docker volume ls -q -f name=pennlib-escriptorium) && docker compose build --no-cache && docker compose up
+docker compose down && docker volume rm $(docker volume ls -q -f name=htr2hpc) && docker compose build --no-cache && docker compose up
 ```
 
 ## Configuration variables

@@ -9,12 +9,11 @@
 #
 ################################################################################
 
-import os
+from escriptorium.settings import *
+from htr2hpc.settings import *
 
 from django.utils.translation import gettext_lazy as _
 
-from escriptorium.settings import *
-from htr2hpc.settings import *
 
 # DEBUG = True
 
