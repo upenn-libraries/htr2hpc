@@ -13,14 +13,14 @@ x-app:
   command: /bin/true
   secrets:
     - ssh_key
+  networks:
+    - escriptorium
 
 services:
 
   web:
     <<: *app
     command: uwsgi --ini /usr/src/app/uwsgi.ini
-    expose:
-      - 8000
 
   channelserver:
     <<: *app
@@ -33,9 +33,13 @@ services:
     volumes:
       - postgres:/var/lib/postgresql/data/
     env_file: variables.env
+    networks:
+      - escriptorium
 
   redis:
     image: "docker.io/redis:alpine"
+    networks:
+      - escriptorium
 
   nginx:
     image: pennlib-escriptorium-nginx
@@ -47,6 +51,8 @@ services:
       - media:/usr/src/app/media
     ports:
       - 8080:80
+    networks:
+      - escriptorium
 
   celery-main:
     <<: *app
@@ -74,6 +80,9 @@ services:
     command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
     ports:
       - 5555:5555
+    networks:
+      - escriptorium
+
 
   # No need while we don't have regular tasks
   # celerybeat:
@@ -95,6 +104,9 @@ services:
     environment:
       - PRIMARY_HOST=${DOMAIN:-localhost}
       - ALLOWED_HOSTS=web ; celery-main ; celery-low-priority; docker0
+    networks:
+      - escriptorium
+
 
 secrets:
   ssh_key:
@@ -105,3 +117,6 @@ volumes:
    media:
    postgres:
    esdata:
+
+networks:
+  escriptorium:
