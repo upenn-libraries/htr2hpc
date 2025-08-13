@@ -2,38 +2,43 @@ version: "3.9"
 
 x-app:
   &app
-  image: pennlib-escriptorium:latest
+  image: htr2hpc:latest
+  pull_policy: never
   volumes:
     - static:/usr/src/app/static
     - media:/usr/src/app/media
+    - ssh:/usr/src/app/.ssh
   command: /bin/true
   environment:
-  - DOMAIN
-  - SECRET_KEY
-  - CSRF_TRUSTED_ORIGINS
-  - USE_X_FORWARDED_HOST
-  - DEBUG
-  - SITE_NAME
-  - REDIS_HOST
-  - REDIS_PORT
-  - SQL_HOST
-  - SQL_PORT
-  - POSTGRES_USER
-  - POSTGRES_PASSWORD
-  - POSTGRES_DB
-  - DJANGO_SU_NAME
-  - DJANGO_SU_EMAIL
-  - DJANGO_SU_PASSWORD
-  - DJANGO_FROM_EMAIL
-  - DJANGO_SETTINGS_MODULE
-  - FLOWER_BASIC_AUTH
-  - EMAIL_HOST
-  - SERVER_EMAIL
-  - EMAIL_SUBJECT_PREFIX
-  - ESCRIPTORIUM_HOST
-  - HPC_HOSTNAME
-  - HPC_SSH_KEYFILE=/run/secrets/gpc_ssh_key
-  - HPC_WORKING_DIR
+    - DOMAIN
+    - SECRET_KEY
+    - CSRF_TRUSTED_ORIGINS
+    - USE_X_FORWARDED_HOST
+    - DEBUG
+    - SITE_NAME
+    - REDIS_HOST
+    - REDIS_PORT
+    - SQL_HOST
+    - SQL_PORT
+    - POSTGRES_USER
+    - POSTGRES_PASSWORD
+    - POSTGRES_DB
+    - DJANGO_SU_NAME
+    - DJANGO_SU_EMAIL
+    - DJANGO_SU_PASSWORD
+    - DJANGO_FROM_EMAIL
+    - DJANGO_SETTINGS_MODULE
+    - FLOWER_BASIC_AUTH
+    - EMAIL_HOST
+    - SERVER_EMAIL
+    - EMAIL_SUBJECT_PREFIX
+    - ESCRIPTORIUM_HOST
+    - HPC_HOSTNAME
+    - HPC_SSH_KEYFILE=/usr/src/app/.ssh/gpc_ssh_key
+    - HPC_WORKING_DIR
+  networks:
+    - escriptorium
+
 services:
 
   web:
@@ -43,6 +48,8 @@ services:
   channelserver:
     <<: *app
     command: daphne --bind 0.0.0.0 --port 5000 -v 1 escriptorium.asgi:application
+    ports:
+      - "5000:5000"
 
   db:
     image: docker.io/library/postgres:15
@@ -52,12 +59,17 @@ services:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
       - POSTGRES_DB
+    networks:
+      - escriptorium
 
   redis:
     image: "docker.io/redis:alpine"
+    networks:
+      - escriptorium
 
   nginx:
-    image: pennlib-escriptorium-nginx
+    image: htr2hpc-nginx:latest
+    pull_policy: never
     environment:
       - SERVERNAME=${DOMAIN:-localhost}
     volumes:
@@ -65,6 +77,8 @@ services:
       - media:/usr/src/app/media
     ports:
       - "0.0.0.0:8080:80"
+    networks:
+      - escriptorium
 
   celery-main:
     <<: *app
@@ -91,6 +105,8 @@ services:
     command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
     ports:
       - 5555:5555
+    networks:
+      - escriptorium
 
   # No need while we don't have regular tasks
   # celerybeat:
@@ -109,9 +125,15 @@ services:
     environment:
       - PRIMARY_HOST=${DOMAIN:-localhost}
       - ALLOWED_HOSTS=web ; celery-main ; celery-low-priority; docker0
+    networks:
+      - escriptorium
 
 volumes:
    static:
    media:
    postgres:
    esdata:
+   ssh:
+
+networks:
+  escriptorium:
