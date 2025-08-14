@@ -2,7 +2,7 @@ version: "3.9"
 
 x-app:
   &app
-  image: htr2hpc:latest
+  image: htr2hpc:${HTR2HPC_IMAGE_TAG:-latest}
   pull_policy: never
   volumes:
     - static:/usr/src/app/static
@@ -70,7 +70,7 @@ services:
       - escriptorium
 
   nginx:
-    image: htr2hpc-nginx:latest
+    image: htr2hpc-nginx:${HTR2HPC_NGINX_IMAGE_TAG:-latest}
     pull_policy: never
     environment:
       - SERVERNAME=${DOMAIN:-localhost}
@@ -109,18 +109,6 @@ services:
       - 5555:5555
     networks:
       - escriptorium
-
-  # No need while we don't have regular tasks
-  # celerybeat:
-  #   build:
-  #     context: ./app
-  #   env_file: variables.env
-  #   volumes:
-  #     - ./static/:/usr/src/app/static
-  #     - ./media/:/usr/src/app/media
-  #     - static:./static/
-  #     - media:./media/
-  #   command: celery -E -A escriptorium beat -l INFO
 
   mail:
     image: registry.gitlab.com/scripta/escriptorium/mail
