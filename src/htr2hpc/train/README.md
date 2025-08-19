@@ -19,7 +19,9 @@ conda init
 # log out and log back in; then
 conda activate htr2hpc
 pip install torchvision torch==2.1 torchaudio==2.1
-pip install git+https://github.com/upenn-libraries/htr2hpc.git@develop#egg=htr2hpc
+pip install git+https://github.com/upenn-libraries/htr2hpc.git@upenn-rework#egg=htr2hpc
+# you may need to install django; adjust version if needed
+pip install django==5.0.7
 ```
 
 To tinker with htr2hpc settings, check out the code from github and install the local checkout as an editable installation:
