@@ -84,8 +84,8 @@ services:
 
   celery-main:
     <<: *app
-    environment:
-      - OMP_NUM_THREADS=1
+#    environment:
+#      - OMP_NUM_THREADS=2
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q default -c ${CELERY_MAIN_CONC:-10} --max-tasks-per-child=10"
 
   celery-live:
