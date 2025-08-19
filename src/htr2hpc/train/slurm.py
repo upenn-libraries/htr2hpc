@@ -39,7 +39,7 @@ def segtrain(
         job_name=f"{prelim_opt}segtrain:{output_model.name}",
         output=f"segtrain_{Slurm.JOB_ARRAY_MASTER_ID}.out",
         time=training_time,
-        partition="low",
+        partition="low_gpu_a40",
         qos="low",
     )
     # do we want to use CUDA Multi-Process Service (MPS) ?
@@ -94,7 +94,7 @@ def recognition_train(
         job_name=f"{prelim_opt}train:{output_model.name}",
         output=f"train_{Slurm.JOB_ARRAY_MASTER_ID}.out",
         time=training_time,
-        partition="low",
+        partition="low_gpu_a40",
         qos="low",
     )
     recogtrain_slurm.add_cmd("module purge")
