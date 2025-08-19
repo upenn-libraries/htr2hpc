@@ -122,7 +122,7 @@ def slurm_job_queue_status(job_id: int) -> str:
     """Use `squeue` to get the full-word status (i.e., PENDING or RUNNING)
     for a queued slurm job."""
     result = subprocess.run(
-        ["squeue", f"--jobs={job_id}", "--only-job-state", "--format=%T", "--noheader"],
+        ["squeue", f"--jobs={job_id}", "--format=%T", "--noheader"],
         capture_output=True,
         text=True,
     )
