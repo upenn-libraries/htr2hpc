@@ -628,6 +628,7 @@ def main():
     arg_options = dict(vars(args))
     del arg_options["clean"]
     del arg_options["mode"]  # converted to training_mode (Segment/Recognize)
+    del arg_options["log_level"]
 
     # initialize training manager
     try:
