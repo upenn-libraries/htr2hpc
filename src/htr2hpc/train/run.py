@@ -571,6 +571,13 @@ def main():
         default=8,
         dest="num_workers",
     )
+    parser.add_argument(
+        '--log-level',
+        dest='log_level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).'
+    )
+
     args = parser.parse_args()
     # validate argument combinations
 
@@ -608,9 +615,10 @@ def main():
     if not args.existing_data:
         args.work_dir.mkdir()
 
-    logging.basicConfig(encoding="utf-8", level=logging.WARN)
+    loglevel = args.log_level.upper() if args.log_level else None
+    logging.basicConfig(encoding="utf-8", level=(loglevel or logging.WARN))
     logger_local = logging.getLogger("htr2hpc")
-    logger_local.setLevel(logging.INFO)
+    logger_local.setLevel((loglevel or logging.INFO))
     # output kraken logging details to confirm binary data looks ok
     logger_kraken = logging.getLogger("kraken")
     # logger_kraken.setLevel(logging.INFO)
