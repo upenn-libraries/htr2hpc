@@ -15,7 +15,7 @@ We are not using the first of these, the login replacement. Instead, we'll use l
   - https://github.com/upenn-libraries/htr2hpc.git
 - The module load names have been changed from `anaconda3` to `miniforge3`
 - The `htr2hpc-train` Slurm job constructor has been modified to specify `--qos` and `--partition`
-- Remote GPC working directory has been added as a setting `settings.HPC_WORKING_DIR`, and defaults to `${HOME}/htr2hpc`. HTR2HPC uses `/scratch` for its working directory; e.g., `working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"`. As of yet, scratch is not writable on GPC2. 
+- Remote GPC working directory has been added as a setting `settings.HPC_WORKING_DIR`, and defaults to `${HOME}/htr2hpc`. HTR2HPC uses `/scratch` for its working directory; e.g., `working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"`. As of yet, scratch is not writable on GPC2.
 - HTR2HPC connects to the GPC using the username of the currently logged-in user. We're going to use a single account
 - The remote command in `htr2hpc.tasks.start_remote_training()` has been changed to invoke a bash login shell so that Slurm environment tools are available. It's been changed:
   - from  `f"module load anaconda3/2024.6 && conda run -n htr2hpc {train_cmd}" `
@@ -81,6 +81,48 @@ When the job has started `training_mgr` calls `self.monitor_slurm_job(job_id)`.
 
 `monitor_slurm_job()` communicates job status information to eScriptorium via the `htr2hpc.api_client.eScriptoriumAPIClient` instance. It relies on `htr2hpc.train.slurm` functions that query job queue status, job status, and job stats.
 
+The usage for `htr2hpc-train` is:
+
+```shell
+usage: htr2hpc-train [-h] -d DOCUMENT_ID [-m MODEL_ID] [-u | --update-if-improved] [--model-name MODEL_NAME] [-p PARTS] [-tr TASK_REPORT_ID] [--existing-data] [--clean | --no-clean]
+                     [--progress | --no-progress] [-w NUM_WORKERS] [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+                     {segmentation,transcription} ... BASE_URL WORKING_DIR
+
+Export content from eScriptorium and train or fine-tune models
+
+positional arguments:
+  BASE_URL              Base URL for eScriptorium instance (without /api/)
+  WORKING_DIR           Working directory where data should be downloaded (must NOT already exist)
+
+options:
+  -h, --help            show this help message and exit
+  -d DOCUMENT_ID, --document DOCUMENT_ID
+                        Document id to export
+  -m MODEL_ID, --model MODEL_ID
+                        Optional model id to use for fine-tuning
+  -u, --update          Update the specified model with the best model from training (requires --model)
+  --update-if-improved  Update the specified model with the best model from training ONLY if improved on original
+  --model-name MODEL_NAME
+                        Name to be used for newly trained model (not compatible with --update)
+  -p PARTS, --parts PARTS
+                        Optional list of part ids for training. Format as #,#,# or #-##.(if not specified, uses entire document)
+  -tr TASK_REPORT_ID, --task-report TASK_REPORT_ID
+                        Optional task report id, for reporting sbatch and slurm output
+  --existing-data       Use existing data from a previous run
+  --clean, --no-clean   Clean up temporary working files after training ends
+  --progress, --no-progress
+                        Show progress
+  -w NUM_WORKERS, --workers NUM_WORKERS
+                        Number of workers for training task (default: 8)
+  --log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+
+mode:
+  supported training modes
+
+  {segmentation,transcription}
+```
+
 #### `htr2hpc.train.slurm`
 
 `htr2hpc.train.slurm` uses the `simple_slurm` python module (https://github.com/amq92/simple_slurm). The functions `segtrain()` and `recognition_train()` set up and enqueue the Slurm batch job. Setup includes the Slurm job parameters (nodes, cpus_per_task, GPU spec, etc.; see below for details), commands to load the HTR2HPC environment, and the full `ketos` command.
@@ -131,7 +173,12 @@ UPenn SAS HPC requires specifying partition and quality of service (see HPC GPC2
 -p, --partition=partition   partition requested
 ```
 
-For SAS's GPC we should use `--qos=low --partition=low`. 
+~~For SAS's GPC we should use `--qos=low --partition=low`.~~
+
+We need to use the `low` quality of service value, and a partition that provides GPU access; not all GPC partitions do.
+For SAS's GPC we should use `--qos=low --partition=low_gpu_a40`?
+
+
 
 ## Slurm QOS and partitions
 
