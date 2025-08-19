@@ -182,4 +182,4 @@ HPC_HOSTNAME = os.getenv('HPC_HOSTNAME', 'localhost')
 # copied in place by escriptorium_setup role
 HPC_SSH_KEYFILE = os.getenv('HPC_SSH_KEYFILE', '~/.ssh/id_rsa')
 HPC_WORKING_DIR = os.getenv('HPC_WORKING_DIR', None)
-
+HPC_SSH_USER = os.getenv('HPC_SSH_USER', None)

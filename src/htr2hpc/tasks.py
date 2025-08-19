@@ -33,8 +33,9 @@ def start_remote_training(
 ):
     # common logic for segtrain and train to kick off remote training script
 
-    # assume we're using LDAP accounts only so usernames match here and on hpc
-    username = user.username
+    # Use the HPC_SSH_USER if provided; otherwise, assume HPC user is logged-in
+    # user
+    username = settings.HPC_SSH_USER or user.username
     api_token = user.auth_token.key
 
     # hostname and ssh key path set in django config
