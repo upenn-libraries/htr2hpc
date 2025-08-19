@@ -34,7 +34,7 @@ x-app:
     - EMAIL_SUBJECT_PREFIX
     - ESCRIPTORIUM_HOST
     - HPC_HOSTNAME
-    - HPC_SSH_KEYFILE=/usr/src/app/.ssh/gpc_ssh_key
+    - HPC_SSH_KEYFILE=/usr/src/app/.ssh/id_ed2551
     - HPC_WORKING_DIR
   networks:
     - escriptorium
