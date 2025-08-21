@@ -1,7 +1,10 @@
+import csv
 import datetime
+import json
 import logging
 import pathlib
 import subprocess
+from io import StringIO
 
 from simple_slurm import Slurm
 
@@ -148,13 +151,18 @@ def slurm_job_status(job_id: int) -> set:
     # sacct returns a table with status for each portion of the job;
     # return all unique status codes for now
     return set(result.stdout.split())
-    
+
+
 def slurm_job_stats(job_id: int) -> str:
-    """Use `jobstats` to get Slurm Job Statistics, to track resource usage"""
+    """Use `sacct` to get Slurm Job Statistics and return as JSON string"""
+    # PU CDH version uses jobstats, which is not available on Penn GPC2
+    # grab all the sacct fields
     result = subprocess.run(
-        ["jobstats", str(job_id)],
+        ['sacct', f"--jobs={job_id}", "--format=ALL", "--parsable2"],
         capture_output=True,
         text=True,
     )
-    # return task status without any whitespace
-    return result.stdout.strip()
+
+    dr = csv.DictReader(StringIO(result.stdout), delimiter="|")
+
+    return json.dumps(list(dr), indent=2)
