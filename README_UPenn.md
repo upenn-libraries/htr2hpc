@@ -9,17 +9,79 @@ HTR2HPC (htr2hpc) has three components:
 
 We are not using the first of these, the login replacement. Instead, we'll use local accounts.
 
-## Changes to htr2hpc-train for SAS HPC GPC2
+## Changes to htr2hpc
+
+Changes have been made to adapt htr2hpc-train for Penn SAS's HPC GPC2 cluster and to dockerize the htr2hpc eScriptorium instance.
+
+### htr2hpc-train changes
 
 - GitHub URLs are changed to point to the Penn repository for HTR2HPC:
   - https://github.com/upenn-libraries/htr2hpc.git
-- The module load names have been changed from `anaconda3` to `miniforge3`
-- The `htr2hpc-train` Slurm job constructor has been modified to specify `--qos` and `--partition`
-- Remote GPC working directory has been added as a setting `settings.HPC_WORKING_DIR`, and defaults to `${HOME}/htr2hpc`. HTR2HPC uses `/scratch` for its working directory; e.g., `working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"`. As of yet, scratch is not writable on GPC2.
-- HTR2HPC connects to the GPC using the username of the currently logged-in user. We're going to use a single account
+- The Slurm module load names have been changed from `anaconda3` to `miniforge3`
+- The `htr2hpc-train` simple_slurm.Slurm job constructor has been modified to specify `--qos` and `--partition`
+- Remote GPC working directory has been added as a setting `settings.HPC_WORKING_DIR`, and defaults to `${HOME}/htr2hpc`. HTR2HPC uses `/scratch` for its working directory; e.g., `working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"`. (See notes below on scratch.)
+- HTR2HPC connects to the GPC using the username of the currently logged-in user. The Penn instance will have all users connection to a single account on the HPC cluster. A variable `settings.HPC_SSH_USER` has been added to hold this account name.
 - The remote command in `htr2hpc.tasks.start_remote_training()` has been changed to invoke a bash login shell so that Slurm environment tools are available. It's been changed:
   - from  `f"module load anaconda3/2024.6 && conda run -n htr2hpc {train_cmd}" `
   - to ` f'bash -l -c "module load miniforge3/24.11.3 && conda run -n htr2hpc {train_cmd}"'`
+- An 'htr2hpc-train' option `--log-level` has been added.
+- `htr2hpc.train.slurm.slurm_job_stats()` uses the `jobstats` program to get after-job stats for training jobs. `jobstats` is not available on the SAS GPC. The function has been changed to use the slurm `sacct` application instead.
+
+### Docker changes
+
+HTR2HPC has been dockerized for development and production portainer deployment. The following files have beend added for docker support:
+
+- Dockerfile
+- Dockerfile.portainer
+- README_Docker.md
+- docker-compose.override.yml_example
+- docker-compose.portainer.yml
+- docker-compose.yml
+- escriptorium/
+  - entrypoint.sh
+  - extra_requirements.txt
+  - local_settings.py
+  - uwsgi.ini
+- nginx/
+  - Dockerfile
+  - nginx.conf
+- variables.env.portainer_example
+- variables.env_example
+
+There are Dockerfiles to build development and portainer htr2hpc eScriptorium images and an nginx image.
+
+## HPC Filesystem Configuration Comparison
+
+Penn SAS's GPC2 and della (the HPC cluster used by PU CDH) have significantly different filesystem behaviors that affect how htr2hpc operates.
+
+### Filesystem Access Patterns
+
+#### Della Configuration
+- **`/home`**: Accessible only to the head node; **not accessible** to compute nodes running Slurm jobs
+- **`/scratch`**: Persistent storage accessible from any node
+
+#### SAS GPC2 Configuration  
+- **`/home`**: Accessible from all nodes (head and compute)
+- **`/scratch`**: 
+  - Accessible **only** from compute nodes during Slurm jobs
+  - Each compute node has its own isolated `/scratch` filesystem
+
+### Compatibility Issues with htr2hpc
+
+The SAS GPC2 scratch configuration is incompatible with htr2hpc's default behavior. Here's why:
+
+#### Default htr2hpc Workflow
+1. `htr2hpc-train` runs on the head node and stages training files in `/scratch/gpfs/{user.username}/htr2hpc`
+2. Slurm training jobs use this same directory as their working directory
+3. Each training session consists of two Slurm jobs sharing the same working directory
+
+#### Problems on SAS GPC2
+1. **Head node access limitation**: `htr2hpc-train` cannot access `/scratch` from the head node for file staging and cleanup operations
+
+2. **Node isolation**: Each compute node has its own `/scratch` filesystem. Since Slurm assigns compute nodes at runtime, the two jobs in a training session may be assigned to different nodes and lose access to shared files
+
+### Solution
+To address these filesystem limitations, we use `$HOME/htr2hpc` exclusively for running Slurm jobs on SAS GPC2, leveraging the fact that `/home` is accessible from all nodes in this environment.
 
 ## Tasks
 
@@ -179,7 +241,6 @@ We need to use the `low` quality of service value, and a partition that provides
 For SAS's GPC we should use `--qos=low --partition=low_gpu_a40`?
 
 
-
 ## Slurm QOS and partitions
 
 **Quality of Service:** From the Slurm documentation (https://slurm.schedmd.com/qos.html), quality of service:
@@ -210,28 +271,28 @@ The sign-up email from HPC provides these additional notes:
 
 > Please do not run jobs on the head node; use
 >
-> ```bash
-> srun -p low --qos=low --pty bash
-> ```
+```bash
+srun -p low --qos=low --pty bash
+```
 >
 > for a preemptable interactive session on a compute node,
 >
-> ```bash
-> srun -p gpc2_compute --qos=normal --pty bash
-> ```
+```bash
+srun -p gpc2_compute --qos=normal --pty bash
+```
 >
 > for a non-preemptable interactive session on a compute node, or schedule jobs via the queue.
 >
 > We have sample scripts for our older cluster, GPC, here: https://computing.sas.upenn.edu/gpc/job/slurm - you can add these GPC2 partition names and qos for GPC2 job wrapper scripts:
 >
-> ```bash
-> #SBATCH -p gpc2_compute
-> #SBATCH --qos=normal
-> ```
+```bash
+#SBATCH -p gpc2_compute
+#SBATCH --qos=normal
+```
 >
 > or
 >
-> ```bash
-> #SBATCH -p low
-> #SBATCH --qos=low
-> ```
+```bash
+#SBATCH -p low
+#SBATCH --qos=low
+```
