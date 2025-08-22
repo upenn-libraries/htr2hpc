@@ -37,7 +37,7 @@ RUN cat requirements.txt.bak extra_requirements.txt | sort | uniq > requirements
 RUN rm requirements.txt.bak extra_requirements.txt
 RUN pip --no-cache-dir install --root-user-action ignore -r requirements.txt
 
-# Change the django port
+# Change the django port; configure workers
 COPY uwsgi.ini /usr/src/app/
 RUN chmod 644 /usr/src/app/uwsgi.ini
 

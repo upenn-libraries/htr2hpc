@@ -3,6 +3,7 @@ FROM registry.gitlab.com/scripta/escriptorium:dev-new-ui-alpha-rev8
 WORKDIR /usr/src/app
 
 COPY ./escriptorium/local_settings.py /usr/src/app/escriptorium/local_settings.py
+RUN chmod 644 /usr/src/app/escriptorium/local_settings.py
 
 # We want to replicate PU CDH's Ansible tasks for eScriptorium:
 #
@@ -25,22 +26,24 @@ RUN line_number=$(($(grep -n "^ *def es_segtrain" ${TASKS_FILE} | cut -d: -f1) -
     sed -i "${line_number}i # EDITED BY pennlib-escritorium Dockerfile" ${TASKS_FILE}
 
 #     - name: Expose read-write training accuracy model field in API
-#      ansible.builtin.replace:
-#        path: "{{ install_root }}/app/apps/api/serializers.py"
-#        # accuracy_percent only occurs once in this file, in the list of
-#        # fields for OCRModelSerializer.
-#        # Add training accuracy immediately after.
-#        regexp: "\\'accuracy_percent\\', \\'rights\\',"
-#        replace: "'accuracy_percent', 'training_accuracy', 'rights',"
+# see: the ansible task referenced above
 ENV SERIALIZERS_PY=/usr/src/app/apps/api/serializers.py
 RUN sed -E -i "s/'accuracy_percent', 'rights',/'accuracy_percent', 'training_accuracy', 'rights',/" ${SERIALIZERS_PY}
 
 # Add htr2hpc to requirements.txt and run `pip install`
-RUN cp requirements.txt requirements.txt.bak
-COPY ./escriptorium/extra_requirements.txt /usr/src/app/extra_requirements.txt
-RUN cat requirements.txt.bak extra_requirements.txt | sort | uniq > requirements.txt
-RUN rm requirements.txt.bak extra_requirements.txt
+# for local development just add this project as ./
+RUN mkdir /htr2hpc
+COPY src/ /htr2hpc/src/
+RUN ls /htr2hpc/
+COPY pyproject.toml /htr2hpc/
+COPY README.md /htr2hpc/
+RUN echo  >> requirements.txt
+RUN echo '/htr2hpc/' >> requirements.txt
 RUN pip --no-cache-dir install --root-user-action ignore -r requirements.txt
+
+# Change the django port; configure processes
+COPY ./escriptorium/uwsgi.ini /usr/src/app/
+RUN chmod 644 /usr/src/app/uwsgi.ini
 
 # update entry point to set the site based on ESCRIPTORIUM_HOST
 COPY ./escriptorium/entrypoint.sh /usr/src/app/

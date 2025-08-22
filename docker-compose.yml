@@ -5,14 +5,12 @@ x-app:
   image: pennlib-escriptorium:latest
   build:
     context: .
-    dockerfile: ./Dockerfile.dev
   env_file: variables.env
   volumes:
     - static:/usr/src/app/static
     - media:/usr/src/app/media
+    - ./ssh:/usr/src/app/.ssh
   command: /bin/true
-  secrets:
-    - ssh_key
   networks:
     - escriptorium
 
@@ -106,11 +104,6 @@ services:
       - ALLOWED_HOSTS=web ; celery-main ; celery-low-priority; docker0
     networks:
       - escriptorium
-
-
-secrets:
-  ssh_key:
-    file: ./ssh/htr2hpc_id_rsa
 
 volumes:
    static:

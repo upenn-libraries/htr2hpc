@@ -1,6 +1,6 @@
 # htr2hpc docker
 
-Penn Libraries' htr2hpc a Dockerfile and development docker-compose.yml for an eScriptorium instance with htr2hpc.
+Penn Libraries' htr2hpc Dockerfile and development docker-compose.yml for an eScriptorium instance with htr2hpc.
 
 The Dockerfile and docker compose configuration automate the installation steps in the [README](README.md) and [Princeton CDH's Ansible playbook](https://github.com/Princeton-CDH/cdh-ansible/blob/main/playbooks/escriptorium.yml).
 
@@ -16,9 +16,9 @@ Create an SSH key and add the public key to the `${HOME}/.ssh/authorized_keys` f
 
 ```bash
 $ mkdir ssh
-$ ssh-keygen -N "" -f ./ssh/htr2hpc_id_rsa -t rsa -b 4096
+$ ssh-keygen -N "" -f ./ssh/htr2hpc_ed25519 -t ed25519
 $ ls ssh
-htr2hpc_id_rsa     htr2hpc_id_rsa.pub
+htr2hpc_ed25519     htr2hpc_ed25519.pub
 ```
 
 Add the `./ssh/htr2hpc_id_rsa.pub` public key to the `${HOME}/.ssh/authorized_keys` file on the HPC cluster. See "SSH key authentication" below for more information.
@@ -50,26 +50,34 @@ Or, if you prefer one line:
 docker compose down && docker volume rm $(docker volume ls -q -f name=htr2hpc) && docker compose build --no-cache && docker compose up
 ```
 
+Or, more thorough:
+
+```bash
+docker compose down -v --remove-orphans && docker container prune -f && { [[ -n "$(docker volume ls -q -f name=htr2hpc)" ]] && docker volume rm -f $(docker volume ls -q -f name=htr2hpc) || docker compose build --no-cache && docker compose up; }
+ ```
 ## Configuration variables
 
-For development, most of the variables can be left as is. You will want to change the following to match your environment:
+For model training in development you'll need to edit the variables: `ESCRIPTORIUM_HOST`, `HPC_SSH_USER`, and `HPC_WORKING_DIR`. `ESCRIPTORIUM_HOST` should be set to the protocol, local machine public IP, and nginx port; e.g., http://1.2.3.4:8080.
+NOTE: I haven't been able to get this to work.
 
 ```shell
 ESCRIPTORIUM_HOST=example.com  # The host escriptorium is running on
 HPC_HOSTNAME=hpc.host.edu      # The hostname of the HPC cluster
+HPC_SSH_USER=uername           # Username if one account is used for training
 ```
 
 ## SSH key authentication
 
 htr2hpc relies on ssh secure authentication to run slurm jobs on the HCP cluster.
 
-The docker compose dev deployment uses docker secrets to store the ssh key on the server. The key is expected to be at `./ssh/htr2hpc_id_rsa`:
+The docker compose dev deployment uses a docker volume to store the ssh key on the server. The key is expected to be at `./ssh/htr2hpc_ed25519`:
 
 ```
 # docker-compose.yml
-secrets:
-  ssh_key:
-    file: ./ssh/htr2hpc_id_rsa
+x-app:
+  # ...
+  volumes:
+    - ./ssh:/usr/src/app/.ssh
 ```
 
 _**IMPORTANT: Do not check the ssh key into version control!**_
@@ -101,7 +109,8 @@ latest eScriptorium image, then
 
 - adds the `escriptorium/local_settings.py` file, which imports the htr2hpc
   module
-- modifies the `requirements.txt` file to include the htr2hpc module, and
+- modifies the `requirements.txt` file to include the htr2hpc module, 
+- add the `escriptorium/uwsgi.ini` custom web server configuration, and
 - runs `pip install` to install the htr2hpc module.
 
 The `pennlib-escriptorium-nginx` image is built from `./nginx/Dockerfile`.
