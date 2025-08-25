@@ -1,298 +1,255 @@
-# HTR2HPC Notes
+# HTR2HPC for UPenn
 
-HTR2HPC (htr2hpc) has three components:
+HTR2HPC enables eScriptorium to leverage High Performance Computing (HPC) clusters for machine learning model training. This document covers the UPenn-specific implementation that adapts HTR2HPC for Penn SAS's GPC2 cluster.
 
-- A replacement for eScriptorium's login that uses Princeton's authentication
-- Training components:
-  - Tasks that replace the eScriptorium celery tasks so that training jobs are sent to the GPC
-  - A Python script that runs on the GPC (see `src/htr2hpc/train/README.md`) that constructs the Ketos training command and communicates with eScriptorium
+## Overview
 
-We are not using the first of these, the login replacement. Instead, we'll use local accounts.
+HTR2HPC consists of three main components:
 
-## Changes to htr2hpc
+1. **Authentication replacement** - Uses Princeton's authentication (not implemented in UPenn version)
+2. **Training components** - Replace eScriptorium's Celery tasks to route training jobs to HPC
+3. **HPC training script** - Python script that runs on the cluster to execute Ketos training
 
-Changes have been made to adapt htr2hpc-train for Penn SAS's HPC GPC2 cluster and to dockerize the htr2hpc eScriptorium instance.
+The UPenn implementation uses local accounts instead of the Princeton authentication system.
 
-### htr2hpc-train changes
+## Architecture
 
-- GitHub URLs are changed to point to the Penn repository for HTR2HPC:
-  - https://github.com/upenn-libraries/htr2hpc.git
-- The Slurm module load names have been changed from `anaconda3` to `miniforge3`
-- The `htr2hpc-train` simple_slurm.Slurm job constructor has been modified to specify `--qos` and `--partition`
-- Remote GPC working directory has been added as a setting `settings.HPC_WORKING_DIR`, and defaults to `${HOME}/htr2hpc`. HTR2HPC uses `/scratch` for its working directory; e.g., `working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"`. (See notes below on scratch.)
-- HTR2HPC connects to the GPC using the username of the currently logged-in user. The Penn instance will have all users connection to a single account on the HPC cluster. A variable `settings.HPC_SSH_USER` has been added to hold this account name.
-- The remote command in `htr2hpc.tasks.start_remote_training()` has been changed to invoke a bash login shell so that Slurm environment tools are available. It's been changed:
-  - from  `f"module load anaconda3/2024.6 && conda run -n htr2hpc {train_cmd}" `
-  - to ` f'bash -l -c "module load miniforge3/24.11.3 && conda run -n htr2hpc {train_cmd}"'`
-- An 'htr2hpc-train' option `--log-level` has been added.
-- `htr2hpc.train.slurm.slurm_job_stats()` uses the `jobstats` program to get after-job stats for training jobs. `jobstats` is not available on the SAS GPC. The function has been changed to use the slurm `sacct` application instead.
+```
+eScriptorium → HTR2HPC Tasks → SSH Connection → GPC2 Cluster
+                    ↓                              ↓
+              Task Management              htr2hpc-train script
+                    ↓                              ↓
+               Status Updates ← API Client ← Slurm Jobs (Ketos)
+```
 
-### Docker changes
+## Key Adaptations for UPenn GPC2
 
-HTR2HPC has been dockerized for development and production portainer deployment. The following files have beend added for docker support:
+### Configuration Changes
 
-- Dockerfile
-- Dockerfile.portainer
-- README_Docker.md
-- docker-compose.override.yml_example
-- docker-compose.portainer.yml
-- docker-compose.yml
-- escriptorium/
-  - entrypoint.sh
-  - extra_requirements.txt
-  - local_settings.py
-  - uwsgi.ini
-- nginx/
-  - Dockerfile
-  - nginx.conf
-- variables.env.portainer_example
-- variables.env_example
+| Component | Change | Reason |
+|-----------|--------|---------|
+| GitHub Repository | Updated to `upenn-libraries/htr2hpc` | Fork maintenance |
+| Module Loading | Changed from `anaconda3` to `miniforge3/24.11.3` | GPC2 environment |
+| Working Directory | Uses `${HOME}/htr2hpc` instead of `/scratch/gpfs/{user.username}/htr2hpc` | GPC2 filesystem limitations |
+| SSH Authentication | Single shared HPC account via `HPC_SSH_USER` | Simplified user management |
+| Slurm Parameters | Added `--qos` and `--partition` requirements | GPC2 cluster requirements |
+| Job Statistics | Uses `sacct` instead of `jobstats` | Tool availability |
 
-There are Dockerfiles to build development and portainer htr2hpc eScriptorium images and an nginx image.
+### Code Modifications
 
-## HPC Filesystem Configuration Comparison
+**Remote Command Execution**
 
-Penn SAS's GPC2 and della (the HPC cluster used by PU CDH) have significantly different filesystem behaviors that affect how htr2hpc operates.
-
-### Filesystem Access Patterns
-
-#### Della Configuration
-- **`/home`**: Accessible only to the head node; **not accessible** to compute nodes running Slurm jobs
-- **`/scratch`**: Persistent storage accessible from any node
-
-#### SAS GPC2 Configuration  
-- **`/home`**: Accessible from all nodes (head and compute)
-- **`/scratch`**: 
-  - Accessible **only** from compute nodes during Slurm jobs
-  - Each compute node has its own isolated `/scratch` filesystem
-
-### Compatibility Issues with htr2hpc
-
-The SAS GPC2 scratch configuration is incompatible with htr2hpc's default behavior. Here's why:
-
-#### Default htr2hpc Workflow
-1. `htr2hpc-train` runs on the head node and stages training files in `/scratch/gpfs/{user.username}/htr2hpc`
-2. Slurm training jobs use this same directory as their working directory
-3. Each training session consists of two Slurm jobs sharing the same working directory
-
-#### Problems on SAS GPC2
-1. **Head node access limitation**: `htr2hpc-train` cannot access `/scratch` from the head node for file staging and cleanup operations
-
-2. **Node isolation**: Each compute node has its own `/scratch` filesystem. Since Slurm assigns compute nodes at runtime, the two jobs in a training session may be assigned to different nodes and lose access to shared files
-
-### Solution
-To address these filesystem limitations, we use `$HOME/htr2hpc` exclusively for running Slurm jobs on SAS GPC2, leveraging the fact that `/home` is accessible from all nodes in this environment.
-
-## Tasks
-
-The HTR2HPC deploy process rewrites the eScriptorium celery `tasks.py` file so that:
-
-1. The functions `segtrain(...)` and `train(...)` are renamed `es_segtrain(...)` and `es_train(...)`
-2. The HTR2HPC tasks `segtrain` and `train` are imported before the renamed functions so that eScriptorium calls the HTR2HPC training functions instead of its own tasks
-
-> **Question:** Why not just import the functions at the end of the file? That should replace the `segtrain` and `train` functions with the HTR2HPC ones. The reason may have to do with the order of imports.
-
-The `segtrain` and `train` methods construct the command that is sent to the `htr2hpc-train` script on the remote GPC.
-
-## Training: `htr2hpc.train`, `src/htr2hpc/train`
-
-The `htr2hpc-train` script constructs, runs, and monitors the Ketos training commands that are run on the GPC (see `src/htr2hpc/train/run.py`, `src/htr2hpc/train/slurm.py`). It also communicates status with and sends updates to eScriptorium via a custom API (see `src/htr2hpc/api_client.py`). The API:
-
-- Manages changes to application models (i.e., Document, ML Model, Task)
-- Requests document information (document list and document details, lists of images, etc.)
-- Downloads files (models, ground truth, images)
-- Updates eScriptorium with task status information
-
-The `htr2hpc.train.run.main()` function defines the parameters and options of the `htr2hpc-train` command. The work itself is handled by the `htr2hpc.train.run.TrainingManager` class. Its `segmentation_training` and `recognition_training` methods call the `htr2hpc.train.slurm` `segtrain` and `recognition_train` functions. The setup and configure the Slurm jobs and build the Ketos training commands. See below for more on HPC GPC and Slurm.
-
-## Training Workflow Details
-
-### eScriptorium Training Workflow
-
-The `htr2hpc.tasks` module provides `segtrain()` and `train()` functions for segmentation and recognition training. These methods construct the `htr2hpc.train` command, with:
-
-- Subcommand: `transcription` or `segmentation`
-- The command options, including the Document, TaskReport, and Model IDs
-- The output directory
-
-The training method then invokes `start_remote_training()`:
+`htr2hpc` runs the training jobs via SSH RPC. Because the default GPC2 SSH shell does not load the SLURM environment, we have to execute a bash login shell. 
 
 ```python
-success = start_remote_training(
-    user, working_dir, cmd, document_pk, model.pk, task_report
+# Before
+result = conn.run(
+    f'module load anaconda3/2024.6 && conda run -n htr2hpc {train_cmd}',
+    env={"ESCRIPTORIUM_API_TOKEN": api_token},
+    warn=True,  # don't throw unexpected error on exit != 0
+)
+
+
+# After  
+result = conn.run(
+    f'bash -l -c "module load miniforge3/24.11.3 && conda run -n htr2hpc {train_cmd}"',
+    env={"ESCRIPTORIUM_API_TOKEN": api_token},
+    warn=True,  # don't throw unexpected error on exit != 0
 )
 ```
 
-Specifically `start_remote_training()`:
+**New Configuration Settings**
+- `HPC_WORKING_DIR`: Remote working directory (default: `${HOME}/htr2hpc`)
+- `HPC_SSH_USER`: Shared HPC account username
+- `--log-level`: Added logging control to htr2hpc-train
 
-- Establishes the SSH connection with the GPC, logging in as the eScriptorium user (see the Changes section above)
+## Filesystem Architecture
+
+### Cluster Comparison
+
+| Filesystem | Della (Princeton) | GPC2 (UPenn) |
+|------------|-------------------|---------------|
+| `/home` | Head node only | All nodes |
+| `/scratch` | All nodes, persistent | Compute nodes only, per-node |
+
+### Why We Use `/home` on GPC2
+
+The default HTR2HPC workflow stages files in `/scratch`, but GPC2's configuration creates two critical issues:
+
+1. **Head node isolation**: `htr2hpc-train` runs on the head node but cannot access `/scratch` for file staging
+2. **Node-specific storage**: Each compute node has its own `/scratch`, so multi-job training sessions can't share files
+
+**Solution**: Use `${HOME}/htr2hpc` as the working directory since `/home` is accessible from all nodes on GPC2.
+
+## Docker Implementation
+
+HTR2HPC has been containerized for both development and production deployment. 
+
+### Added Files
+```
+Dockerfile                           # Development image
+Dockerfile.portainer                 # Production image  
+docker-compose.yml                   # Base composition
+docker-compose.portainer.yml         # Production composition
+docker-compose.override.yml_example  # Development overrides
+README_Docker.md                     # Docker documentation
+variables.env_example                # Environment template
+variables.env.portainer_example      # Production environment template
+
+escriptorium/
+├── entrypoint.sh                    # Container startup script
+├── extra_requirements.txt           # Additional Python packages
+├── local_settings.py                # Django configuration
+└── uwsgi.ini                        # WSGI server config
+
+nginx/
+├── Dockerfile                       # Nginx proxy image
+└── nginx.conf                       # Reverse proxy configuration
+```
+
+See the [Docker README](README_Docker.md) for details.  
+
+## Training Workflow
+
+### eScriptorium Training Workflow
+
+The `htr2hpc.tasks` functions `segtrain()` and `train()` replace the native eScriptorium tasks. The htr2hpc tasks run training tasks as slurm jobs on the HPC cluster via SSH RPC. They construct the command line `htr2hpc-train` commands and call `start_remote_training()`, which: 
+
+- Establishes the SSH connection with the GPC
 - Changes to the `working_dir`
 - Sets the `ESCRIPTORIUM_API_TOKEN` environment variable used by `htr2hpc-train` to communicate with eScriptorium
 - Loads the `conda` module (`miniforge3` for UPenn) and activates the `htr2hpc` environment
 - Runs the `htr2hpc-train` command
 
-### `htr2hpc-train` Training Workflow
+### Remote Training Process
 
-#### `htr2hpc.train.run`
+`htr2hpc-train` is installed on the HPC cluster. It constructs a Slurm batch job that runs the `ketos` command to perform that training.
 
-The work of `htr2hpc-train` is done in the `htr2hpc.train.run` module. Its main method parses the command line arguments, creates an `htr2hpc.train.TrainingManager` instance (`training_mgr`), and calls `training_mgr.training_prep`, which retrieves the training data from eScriptorium (images, model, etc.). It then runs either `training_mgr.segmentation_training()` or `training_mgr.recognition_training()`, based on the CLI subcommand.
+**Command Line Interface**
 
-The training methods assemble Slurm job parameters, paths, and resource estimates and call `htr2hpc.train.slurm.segtrain()` or `htr2hpc.train.slurm.recognition_train()`, which returns the Slurm job ID.
-
-When the job has started `training_mgr` calls `self.monitor_slurm_job(job_id)`.
-
-`monitor_slurm_job()` communicates job status information to eScriptorium via the `htr2hpc.api_client.eScriptoriumAPIClient` instance. It relies on `htr2hpc.train.slurm` functions that query job queue status, job status, and job stats.
-
-The usage for `htr2hpc-train` is:
-
-```shell
-usage: htr2hpc-train [-h] -d DOCUMENT_ID [-m MODEL_ID] [-u | --update-if-improved] [--model-name MODEL_NAME] [-p PARTS] [-tr TASK_REPORT_ID] [--existing-data] [--clean | --no-clean]
-                     [--progress | --no-progress] [-w NUM_WORKERS] [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
-                     {segmentation,transcription} ... BASE_URL WORKING_DIR
-
-Export content from eScriptorium and train or fine-tune models
-
-positional arguments:
-  BASE_URL              Base URL for eScriptorium instance (without /api/)
-  WORKING_DIR           Working directory where data should be downloaded (must NOT already exist)
-
-options:
-  -h, --help            show this help message and exit
-  -d DOCUMENT_ID, --document DOCUMENT_ID
-                        Document id to export
-  -m MODEL_ID, --model MODEL_ID
-                        Optional model id to use for fine-tuning
-  -u, --update          Update the specified model with the best model from training (requires --model)
-  --update-if-improved  Update the specified model with the best model from training ONLY if improved on original
-  --model-name MODEL_NAME
-                        Name to be used for newly trained model (not compatible with --update)
-  -p PARTS, --parts PARTS
-                        Optional list of part ids for training. Format as #,#,# or #-##.(if not specified, uses entire document)
-  -tr TASK_REPORT_ID, --task-report TASK_REPORT_ID
-                        Optional task report id, for reporting sbatch and slurm output
-  --existing-data       Use existing data from a previous run
-  --clean, --no-clean   Clean up temporary working files after training ends
-  --progress, --no-progress
-                        Show progress
-  -w NUM_WORKERS, --workers NUM_WORKERS
-                        Number of workers for training task (default: 8)
-  --log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
-                        Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
-
-mode:
-  supported training modes
-
-  {segmentation,transcription}
+```bash
+htr2hpc-train [-h] -d DOCUMENT_ID [-m MODEL_ID] [-u | --update-if-improved] 
+              [--model-name MODEL_NAME] [-p PARTS] [-tr TASK_REPORT_ID] 
+              [--existing-data] [--clean | --no-clean] [--progress | --no-progress] 
+              [-w NUM_WORKERS] [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
+              {segmentation,transcription} ... BASE_URL WORKING_DIR
 ```
 
-#### `htr2hpc.train.slurm`
+#### Key `htr2hpc-train` Components
 
-`htr2hpc.train.slurm` uses the `simple_slurm` python module (https://github.com/amq92/simple_slurm). The functions `segtrain()` and `recognition_train()` set up and enqueue the Slurm batch job. Setup includes the Slurm job parameters (nodes, cpus_per_task, GPU spec, etc.; see below for details), commands to load the HTR2HPC environment, and the full `ketos` command.
+**TrainingManager Class** (`htr2hpc.train.run`)
+- Parses command line arguments
+- Retrieves training data from eScriptorium via API
+- Coordinates segmentation or recognition training
+- Monitors job status and communicates with eScriptorium
 
-`segtrain()` and `recognition_train()` queue the Slurm batch and return the job ID:
+**Slurm Integration** (`htr2hpc.train.slurm`)
+- Uses `simple_slurm` Python module for job management
+- Configures job parameters (resources, queues, time limits)
+- Submits jobs and returns job IDs for monitoring
 
-```python
-return segtrain_slurm.sbatch(segtrain_cmd)
-```
+#### Training Process
+1. **Preparation**: Download images, models, and ground truth data
+2. **Job Setup**: Configure Slurm parameters and Ketos commands  
+3. **Execution**: Submit batch job to cluster
+4. **Monitoring**: Track job status and report progress
+5. **Completion**: Upload results and clean up temporary files
 
-### Slurm Job Parameters
+## Slurm Configuration
 
-Slurm parameters are passed to the `simple_slurm.Slurm` constructor. Here is Princeton's `recognition_slurm` instantiation:
+### Resource Specifications
 
+**Recognition Training Example:**
 ```python
 recogtrain_slurm = Slurm(
-    nodes=1,
-    ntasks=1,
-    cpus_per_task=num_workers,
-    mem_per_cpu=mem_per_cpu,
-    gres=["gpu:1"],
-    job_name=f"{prelim_opt}train:{output_model.name}",
-    output=f"train_{Slurm.JOB_ARRAY_MASTER_ID}.out",
-    time=training_time,
+    nodes=1,                    # Single node
+    ntasks=1,                   # One task
+    cpus_per_task=num_workers,  # CPU cores per task
+    mem_per_cpu=mem_per_cpu,    # Memory per CPU core
+    gres=["gpu:1"],             # GPU requirement
+    job_name=f"train:{model}",  # Job identification
+    output="train.out",         # Output file
+    time=training_time,         # Time limit
+    qos="low",                  # Quality of service (UPenn)
+    partition="low_gpu_a40"     # Partition with GPU access (UPenn)
 )
 ```
 
-These parameters correspond to, in order:
+### GPC2-Specific Requirements
 
-```
--N, --nodes=N               number of nodes on which to run (N = min[-max])
--n, --ntasks=ntasks         number of tasks to run
--c, --cpus-per-task=ncpus   number of cpus required per task
-    --mem-per-cpu=MB        maximum amount of real memory per allocated
-                            cpu required by the job
-    --gres=list             required generic resources (see below)
--J, --job-name=jobname      name of job
--o, --output=out            file for batch script's standard output
--t, --time=minutes          time limit
-```
+**Quality of Service (QOS)**: Controls job scheduling priority and resource limits
+- `low`: Preemptable jobs with lower priority
+- `normal`: Standard priority, non-preemptable
 
-**--gres**: This is where GPUs are specified (see https://slurm.schedmd.com/gres.html).
+**Partitions**: Different hardware configurations and access policies
+- `low`: Preemptable compute nodes
+- `low_gpu_a40`: GPU-enabled nodes (A40 cards)
 
-UPenn SAS HPC requires specifying partition and quality of service (see HPC GPC2 and Slurm below for details). The Slurm CLI parameters are:
+### Interactive Sessions
 
-```
--q, --qos=qos               quality of service
--p, --partition=partition   partition requested
-```
+For development and testing:
 
-~~For SAS's GPC we should use `--qos=low --partition=low`.~~
-
-We need to use the `low` quality of service value, and a partition that provides GPU access; not all GPC partitions do.
-For SAS's GPC we should use `--qos=low --partition=low_gpu_a40`?
-
-
-## Slurm QOS and partitions
-
-**Quality of Service:** From the Slurm documentation (https://slurm.schedmd.com/qos.html), quality of service:
-
-> will affect the job in three key ways: scheduling priority, preemption, and resource limits.
-
-**Partition:** A Slurm cluster consists of nodes grouped under partitions. From the Slurm Quick Start guide (https://slurm.schedmd.com/quickstart.html):
-
-> The partitions can be considered job queues, each of which has an assortment of constraints such as job size limit, job time limit, users permitted to use it, etc.
-
-The `sinfo` command shows summary information about cluster partitions and nodes. The `squeue` command shows detailed information about jobs, the partitions and nodes they are running on.
-
-## HPC GPC2 and Slurm
-
-SAS HPC provides examples and links to Slurm documentation here:
-
-- https://computing.sas.upenn.edu/gpc
-- https://computing.sas.upenn.edu/gpc/software-environments
-- https://computing.sas.upenn.edu/gpc/job/slurm
-
-They also provide useful links to Slurm documentation:
-
-- https://slurm.schedmd.com/quickstart.html (quickstart guide)
-- https://slurm.schedmd.com/pdfs/summary.pdf (list of Slurm command options)
-- https://slurm.schedmd.com/man_index.html (man pages for Slurm)
-
-The sign-up email from HPC provides these additional notes:
-
-> Please do not run jobs on the head node; use
->
 ```bash
+# Preemptable session
 srun -p low --qos=low --pty bash
-```
->
-> for a preemptable interactive session on a compute node,
->
-```bash
+
+# Standard session  
 srun -p gpc2_compute --qos=normal --pty bash
 ```
->
-> for a non-preemptable interactive session on a compute node, or schedule jobs via the queue.
->
-> We have sample scripts for our older cluster, GPC, here: https://computing.sas.upenn.edu/gpc/job/slurm - you can add these GPC2 partition names and qos for GPC2 job wrapper scripts:
->
+
+## API Communication
+
+The `eScriptoriumAPIClient` handles communication between the HPC cluster and eScriptorium:
+
+**Core Functions:**
+- Download training data (images, models, ground truth)
+- Update training task status
+- Upload completed models
+- Report job progress and statistics
+
+**Authentication**: Uses `ESCRIPTORIUM_API_TOKEN` environment variable set by the SSH session
+
+## Monitoring and Logging
+
+**Job Status Tracking:**
+- Real-time status updates via Slurm commands (`squeue`, `sacct`)
+- Progress reporting to eScriptorium task system
+- Configurable log levels for debugging
+
+**Resource Monitoring:**
+- Post-job statistics via `sacct` command
+- CPU, memory, and GPU utilization tracking
+- Training performance metrics
+
+## Installation and Setup
+
+See `README_Docker.md` for containerized deployment instructions.
+
+### Environment Variables
+
+Key settings for UPenn deployment:
 ```bash
-#SBATCH -p gpc2_compute
-#SBATCH --qos=normal
+HPC_SSH_USER=shared_hpc_account
+HPC_WORKING_DIR=${HOME}/htr2hpc
+ESCRIPTORIUM_API_TOKEN=your_token_here
 ```
->
-> or
->
-```bash
-#SBATCH -p low
-#SBATCH --qos=low
-```
+
+## Troubleshooting
+
+**Debug Mode:**
+Use `htr2hpc-train` options `--log-level DEBUG` for detailed execution logging.
+
+## References
+
+**Slurm Documentation:**
+- [Quick Start Guide](https://slurm.schedmd.com/quickstart.html)
+- [Command Summary](https://slurm.schedmd.com/pdfs/summary.pdf)
+- [Manual Pages](https://slurm.schedmd.com/man_index.html)
+
+**UPenn SAS HPC:**
+- [GPC2 Cluster Documentation](https://computing.sas.upenn.edu/gpc)
+- [Software Environments](https://computing.sas.upenn.edu/gpc/software-environments)
+- [Slurm Job Submission](https://computing.sas.upenn.edu/gpc/job/slurm)
+
+## Note
+Anthropic's Claude.ai was used to revise this README based on a earlier draft by @emery-upenn. The AI-generated revision was edited and corrected, also by @emeryr-upenn.
