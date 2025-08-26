@@ -5,6 +5,7 @@ x-app:
   image: pennlib-escriptorium:latest
   build:
     context: .
+    dockerfile: Dockerfile.2
   env_file: variables.env
   volumes:
     - static:/usr/src/app/static
@@ -18,16 +19,19 @@ services:
 
   web:
     <<: *app
+    restart: always
     command: uwsgi --ini /usr/src/app/uwsgi.ini
 
   channelserver:
     <<: *app
+    restart: always
     command: daphne --bind 0.0.0.0 --port 5000 -v 1 escriptorium.asgi:application
     expose:
       - 5000
 
   db:
     image: docker.io/library/postgres:15
+    restart: always
     volumes:
       - postgres:/var/lib/postgresql/data/
     env_file: variables.env
@@ -36,12 +40,14 @@ services:
 
   redis:
     image: "docker.io/redis:alpine"
+    restart: always
     networks:
       - escriptorium
 
   nginx:
     image: pennlib-escriptorium-nginx
     build: ./nginx
+    restart: always
     environment:
       - SERVERNAME=${DOMAIN:-localhost}
     volumes:
@@ -56,18 +62,22 @@ services:
     <<: *app
     environment:
       - OMP_NUM_THREADS=1
-    command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q default -c ${CELERY_MAIN_CONC:-10} --max-tasks-per-child=10"
+    restart: always
+    command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q default -c ${CELERY_MAIN_CONC:-10} --max-tasks-per-child=10 --pool=threads"
 
   celery-live:
     <<: *app
+    restart: always
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q live -c ${CELERY_LIVE_CONC:-10} --max-tasks-per-child=10"
 
   celery-low-priority:
     <<: *app
+    restart: always
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q low-priority -c ${CELERY_LOW_CONC:-10} --max-tasks-per-child=10"
 
   celery-gpu: &celery-gpu
     <<: *app
+    restart: always
     environment:
       - KRAKEN_TRAINING_DEVICE=cpu
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q gpu -c 1 --max-tasks-per-child=1"
@@ -75,6 +85,7 @@ services:
 
   flower:
     image: docker.io/mher/flower
+    restart: always
     command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
     ports:
       - 5555:5555

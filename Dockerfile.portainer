@@ -1,4 +1,44 @@
-FROM registry.gitlab.com/scripta/escriptorium:dev-new-ui-alpha-rev8
+FROM docker.io/library/node:12-alpine AS frontend
+
+RUN apk update && apk add git
+
+ENV ESCRIPTORIUM_SRC=/escriptorium-src
+RUN git clone https://gitlab.com/scripta/escriptorium.git ${ESCRIPTORIUM_SRC} && \
+    cd ${ESCRIPTORIUM_SRC} && \
+    git checkout tags/dev-0.14.2
+
+RUN cp -r ${ESCRIPTORIUM_SRC}/front /build
+WORKDIR /build
+RUN npm ci && npm run production
+
+# Pull official base image
+FROM registry.gitlab.com/scripta/escriptorium/base:kraken529 AS escriptorium
+
+# try to autodetect number of cpus available
+# ENV NGINX_WORKER_PROCESSES auto
+
+ARG VERSION_DATE="passthistobuildcmd"
+ENV VERSION_DATE=$VERSION_DATE
+ENV FRONTEND_DIR=/usr/src/app/front
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+ENV ESCRIPTORIUM_SRC=/escriptorium-src
+COPY --from=frontend ${ESCRIPTORIUM_SRC} ${ESCRIPTORIUM_SRC}
+
+# set work directory
+WORKDIR /usr/src/app
+
+RUN cp ${ESCRIPTORIUM_SRC}/app/entrypoint.sh /usr/src/app/entrypoint.sh && \
+    cp ${ESCRIPTORIUM_SRC}/app/manage.py /usr/src/app/manage.py && \
+    cp ${ESCRIPTORIUM_SRC}/app/requirements.txt /usr/src/app/requirements.txt && \
+    cp ${ESCRIPTORIUM_SRC}/app/uwsgi.ini /usr/src/app/uwsgi.ini && \
+    cp -r ${ESCRIPTORIUM_SRC}/app/apps /usr/src/app/apps && \
+    cp -r ${ESCRIPTORIUM_SRC}/app/escriptorium /usr/src/app/escriptorium && \
+    cp -r ${ESCRIPTORIUM_SRC}/app/locale /usr/src/app/locale && \
+    cp -r ${ESCRIPTORIUM_SRC}/app/homepage /usr/src/app/homepage && \
+    rm -rf ${ESCRIPTORIUM_SRC}
+COPY --from=frontend /build/dist /usr/src/app/front
 
 WORKDIR /usr/src/app
 

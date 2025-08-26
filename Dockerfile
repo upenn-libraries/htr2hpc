@@ -1,4 +1,12 @@
-FROM registry.gitlab.com/scripta/escriptorium:dev-new-ui-alpha-rev8
+FROM alpine/git as escriptorium
+
+WORKDIR /app
+RUN git clone https://gitlab.com/scripta/escriptorium.git
+RUN git checkout tags/dev-0.14.2
+
+
+
+FROM registry.gitlab.com/scripta/escriptorium/base:kraken529 AS escriptorium
 
 WORKDIR /usr/src/app
 

@@ -44,18 +44,21 @@ services:
 
   web:
     <<: *app
+    restart: always
     command: uwsgi --ini /usr/src/app/uwsgi.ini
     ports:
       - "8899:8899"
 
   channelserver:
     <<: *app
+    restart: always
     command: daphne --bind 0.0.0.0 --port 5000 -v 1 escriptorium.asgi:application
     ports:
       - "5000:5000"
 
   db:
     image: docker.io/library/postgres:15
+    restart: always
     volumes:
       - postgres:/var/lib/postgresql/data/
     environment:
@@ -67,12 +70,14 @@ services:
 
   redis:
     image: "docker.io/redis:alpine"
+    restart: always
     networks:
       - escriptorium
 
   nginx:
     image: htr2hpc-nginx:${HTR2HPC_NGINX_IMAGE_TAG:-latest}
     pull_policy: never
+    restart: always
     environment:
       - SERVERNAME=${DOMAIN:-localhost}
     volumes:
@@ -85,26 +90,31 @@ services:
 
   celery-main:
     <<: *app
+    restart: always
 #    environment:
 #      - OMP_NUM_THREADS=2
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q default -c ${CELERY_MAIN_CONC:-10} --max-tasks-per-child=10"
 
   celery-live:
     <<: *app
+    restart: always
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q live -c ${CELERY_LIVE_CONC:-10} --max-tasks-per-child=10"
 
   celery-low-priority:
     <<: *app
+    restart: always
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q low-priority -c ${CELERY_LOW_CONC:-10} --max-tasks-per-child=10"
 
   celery-gpu: &celery-gpu
     <<: *app
+    restart: always
     environment:
       - KRAKEN_TRAINING_DEVICE=cpu
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q gpu -c 1 --max-tasks-per-child=1"
 
   flower:
     image: docker.io/mher/flower
+    restart: always
     command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
     ports:
       - 5555:5555
