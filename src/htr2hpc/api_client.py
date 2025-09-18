@@ -210,7 +210,10 @@ class eScriptoriumAPIClient:
         """
         # support absolute urls for retrieving paged results,
         # but only urls within the configured eScriptorium instance
-        if url.startswith(self.api_root):
+        # Compare the URLs' netloc (i.e., host); in docker eScriptorium
+        # returns a next page URL with scheme http, not https; assume
+        # that if the hosts are the same, URL is an API path
+        if urlparse(url).netloc and urlparse(url).netloc == urlparse(self.api_root).netloc:
             rqst_url = url
         else:
             rqst_url = f"{self.api_root}/{url}"
