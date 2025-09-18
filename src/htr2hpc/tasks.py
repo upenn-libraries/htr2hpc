@@ -213,6 +213,7 @@ def segtrain(
 
     if logger.level <= logging.DEBUG:
         arg_options.append("--log-level DEBUG")
+        arg_options.append("--no-clean")
 
     # part ids are optional
     if part_pks:
@@ -388,6 +389,7 @@ def train(
 
     if logger.level <= logging.DEBUG:
         arg_options.append("--log-level DEBUG")
+        arg_options.append("--no-clean")
 
     # model is technically optional for this task but it should
     # always be passed in by escriptorium calling code
