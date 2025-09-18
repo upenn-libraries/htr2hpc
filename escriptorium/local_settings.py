@@ -149,7 +149,7 @@ LOGGING = {
         },
         '{{ django_app }}': {
             'handlers': ['debug_log'],
-            'level': 'WARN',
+            'level': 'DEBUG',
             'propagate': True,
         },
         'htr2hpc': {
