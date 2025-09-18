@@ -211,6 +211,9 @@ def segtrain(
         f"--task-report {task_report.pk}",  # task reporting
     ]
 
+    if logger.level <= logging.DEBUG:
+        arg_options.append("--log-level DEBUG")
+
     # part ids are optional
     if part_pks:
         # parse and serialize with intspan since that's what we use on the other side
@@ -382,6 +385,9 @@ def train(
         "--no-progress",  # disable progressbar
         f"--task-report {task_report.pk}",  # task reporting
     ]
+
+    if logger.level <= logging.DEBUG:
+        arg_options.append("--log-level DEBUG")
 
     # model is technically optional for this task but it should
     # always be passed in by escriptorium calling code
