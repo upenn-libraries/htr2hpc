@@ -8,6 +8,7 @@
 #
 #
 ################################################################################
+import os
 
 from escriptorium.settings import *
 from htr2hpc.settings import *
@@ -175,6 +176,10 @@ LOGGING = {
 # }
 # {% endif %}
 # {% endblock %}
+
+# Force HTTPS
+DEFAULT_SCHEME = 'https'
+SECURE_SSL_REDIRECT = os.getenv('FORCE_HTTPS', 'False').lower() == 'true'
 
 # Extra app-specific configuration
 # custom config for htr2hpc
