@@ -179,7 +179,9 @@ LOGGING = {
 
 # Force HTTPS
 DEFAULT_SCHEME = 'https'
-SECURE_SSL_REDIRECT = os.getenv('FORCE_HTTPS', 'False').lower() == 'true'
+# Following https://stackoverflow.com/a/68310760
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Extra app-specific configuration
 # custom config for htr2hpc
