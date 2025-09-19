@@ -377,20 +377,21 @@ class TrainingManager:
             msg = "Encountered errors. Ending script..."
         else:
             msg = "Submitting next slurm job..."
-        
-        task_report = self.api.task_details(self.task_report_id)
-        self.api.task_update(
-            self.task_report_id,
-            task_report.label,
-            task_report.user,
-            f"""{task_report.messages}
-            
-            Preliminary train task to calibrate requirements completed.
-            - The recommended mem per cpu is {mem_per_cpu}
-            - The recommended duration time is {full_duration} for {epoch_request} epochs.
-            - The prelim epoch with the highest accuracy was {best_epoch} with {best_acc}.
-            {msg}""",
-        )
+
+        if self.task_report_id:
+            task_report = self.api.task_details(self.task_report_id)
+            self.api.task_update(
+                self.task_report_id,
+                task_report.label,
+                task_report.user,
+                f"""{task_report.messages}
+
+                Preliminary train task to calibrate requirements completed.
+                - The recommended mem per cpu is {mem_per_cpu}
+                - The recommended duration time is {full_duration} for {epoch_request} epochs.
+                - The prelim epoch with the highest accuracy was {best_epoch} with {best_acc}.
+                {msg}""",
+            )
         return abs_prelim_model_file, full_duration, mem_per_cpu, epoch_request
     
 
