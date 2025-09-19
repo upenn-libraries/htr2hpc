@@ -178,8 +178,9 @@ LOGGING = {
 # {% endblock %}
 
 # Force HTTPS
+SECURE_SSL_REDIRECT = True
+USE_TLS = True
 DEFAULT_SCHEME = 'https'
-SECURE_SSL_REDIRECT = os.getenv('FORCE_HTTPS', 'False').lower() == 'true'
 
 # Extra app-specific configuration
 # custom config for htr2hpc
