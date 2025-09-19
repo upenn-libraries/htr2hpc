@@ -177,11 +177,12 @@ LOGGING = {
 # {% endif %}
 # {% endblock %}
 
-# Force HTTPS
-DEFAULT_SCHEME = 'https'
-# Following https://stackoverflow.com/a/68310760
+# # Force API to return HTTPS URLs
+# Claude.ai says to use:
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_PORT = True
+SECURE_SSL_REDIRECT = False  # nginx handles this
 
 # Extra app-specific configuration
 # custom config for htr2hpc
