@@ -47,7 +47,7 @@ LANGUAGES = [
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 # ALLOWED_HOSTS = [{% for host in django_allowed_hosts %}"{{ host }}", {% endfor %}]
 
-CSRF_TRUSTED_ORIGINS = ["https://*.upenn.edu", "http://localhost:8000"]
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'https://*.upenn.edu,http://localhost:8000').split(',')
 
 # Use x-forwarded-proto header to tell if request from nginx was https or not
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -183,6 +183,8 @@ USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_PORT = True
 SECURE_SSL_REDIRECT = False  # nginx handles this
+
+IIIF_IMPORT_QUALITY = os.getenv('IIIF_IMPORT_QUALITY', '!1800,1800')
 
 # Extra app-specific configuration
 # custom config for htr2hpc
