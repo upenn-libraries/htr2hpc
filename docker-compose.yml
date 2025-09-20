@@ -2,10 +2,10 @@ version: "3.9"
 
 x-app:
   &app
-  image: pennlib-escriptorium:latest
+  image: htr2hpc:latest
   build:
     context: .
-    dockerfile: Dockerfile.2
+    dockerfile: Dockerfile
   env_file: variables.env
   volumes:
     - static:/usr/src/app/static
@@ -21,6 +21,9 @@ services:
     <<: *app
     restart: always
     command: uwsgi --ini /usr/src/app/uwsgi.ini
+    ports:
+      - "8899:8899"
+
 
   channelserver:
     <<: *app
@@ -45,7 +48,7 @@ services:
       - escriptorium
 
   nginx:
-    image: pennlib-escriptorium-nginx
+    image: "htr2hpc-nginx:latest"
     build: ./nginx
     restart: always
     environment:
@@ -54,7 +57,7 @@ services:
       - static:/usr/src/app/static
       - media:/usr/src/app/media
     ports:
-      - 8080:80
+      - "8080:80"
     networks:
       - escriptorium
 
