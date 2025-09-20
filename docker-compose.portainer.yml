@@ -10,33 +10,34 @@ x-app:
     - ssh:/usr/src/app/.ssh
   command: /bin/true
   environment:
-    - DOMAIN
-    - SECRET_KEY
     - CSRF_TRUSTED_ORIGINS
-    - USE_X_FORWARDED_HOST
     - DEBUG
-    - SITE_NAME
-    - REDIS_HOST
-    - REDIS_PORT
-    - SQL_HOST
-    - SQL_PORT
-    - POSTGRES_USER
-    - POSTGRES_PASSWORD
-    - POSTGRES_DB
-    - DJANGO_SU_NAME
-    - DJANGO_SU_EMAIL
-    - DJANGO_SU_PASSWORD
     - DJANGO_FROM_EMAIL
     - DJANGO_SETTINGS_MODULE
-    - FLOWER_BASIC_AUTH
+    - DJANGO_SU_EMAIL
+    - DJANGO_SU_NAME
+    - DJANGO_SU_PASSWORD
+    - DOMAIN
     - EMAIL_HOST
-    - SERVER_EMAIL
     - EMAIL_SUBJECT_PREFIX
     - ESCRIPTORIUM_HOST
+    - FLOWER_BASIC_AUTH
     - HPC_HOSTNAME
     - HPC_SSH_KEYFILE
     - HPC_SSH_USER
     - HPC_WORKING_DIR
+    - IIIF_IMPORT_QUALITY
+    - POSTGRES_DB
+    - POSTGRES_PASSWORD
+    - POSTGRES_USER
+    - REDIS_HOST
+    - REDIS_PORT
+    - SECRET_KEY
+    - SERVER_EMAIL
+    - SITE_NAME
+    - SQL_HOST
+    - SQL_PORT
+    - USE_X_FORWARDED_HOST
   networks:
     - escriptorium
 
@@ -52,9 +53,7 @@ services:
   channelserver:
     <<: *app
     restart: always
-    command: daphne --bind 0.0.0.0 --port 5000 -v 1 escriptorium.asgi:application
-    ports:
-      - "5000:5000"
+    command: daphne --bind 0.0.0.0 --port 5000 -v 3 escriptorium.asgi:application
 
   db:
     image: docker.io/library/postgres:15
@@ -91,8 +90,6 @@ services:
   celery-main:
     <<: *app
     restart: always
-#    environment:
-#      - OMP_NUM_THREADS=2
     command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q default -c ${CELERY_MAIN_CONC:-10} --max-tasks-per-child=10"
 
   celery-live:
@@ -117,7 +114,7 @@ services:
     restart: always
     command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
     ports:
-      - 5555:5555
+      - "5555:5555"
     networks:
       - escriptorium
 
