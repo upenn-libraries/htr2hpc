@@ -195,6 +195,7 @@ def segtrain(
     # TODO: change for SAS GPC fs
     # working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"
     working_dir = settings.HPC_WORKING_DIR if settings.HPC_WORKING_DIR else "${HOME}/htr2hpc"
+    workers = settings.KETOS_WORKERS if settings.KETOS_WORKERS else 8
     # includes a timestamp to ensure uniqueness, since
     # script will fail if there is an existing directory
     outdir = f"segtrain_doc{document_pk}_{directory_timestamp()}"
@@ -209,6 +210,7 @@ def segtrain(
         f"--document {document_pk}",  # document id is always required
         "--no-progress",  # disable progressbar
         f"--task-report {task_report.pk}",  # task reporting
+        f"--workers {workers}",  # number of ketos workers
     ]
 
     if logger.level <= logging.DEBUG:

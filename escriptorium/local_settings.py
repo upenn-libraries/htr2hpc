@@ -180,11 +180,14 @@ LOGGING = {
 # # Force API to return HTTPS URLs
 # Claude.ai says to use:
 USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_PORT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = False  # nginx handles this
 
 IIIF_IMPORT_QUALITY = os.getenv('IIIF_IMPORT_QUALITY', '!1800,1800')
+
+# Remote training command; set by htr2hpc.tasks.train,segtrain
+KETOS_WORKERS = os.getenv('KETOS_WORKERS', '8')
 
 # Extra app-specific configuration
 # custom config for htr2hpc
