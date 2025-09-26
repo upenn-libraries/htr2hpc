@@ -51,7 +51,7 @@ def stats_get_max_cpu(job_stats: SlurmJobStats):
     #     gb_used = float(mem_usage[0][0]) / 1000 if mem_usage[0][1] == 'MB' else float(mem_usage[0][0])
     #     return gb_used
 
-    return job_stats.mem_per_cpu
+    return job_stats.mem_per_cpu()
 
 
 def calc_full_duration(slurm_output: str, job_stats: SlurmJobStats):
@@ -64,10 +64,10 @@ def calc_full_duration(slurm_output: str, job_stats: SlurmJobStats):
     epoch_avg = slurm_get_avg_epoch(slurm_output)
     epoch_count = slurm_count_epoch(slurm_output)
     
-    if job_stats.job_duration:
+    if job_stats.job_duration():
         # t = datetime.datetime.strptime(job_duration[0], '%H:%M:%S')
         # job_duration = datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second).seconds
-        job_duration = job_stats.job_duration
+        job_duration = job_stats.job_duration()
         if epoch_avg:
             setup_time = job_duration - ( epoch_avg * epoch_count )
             
