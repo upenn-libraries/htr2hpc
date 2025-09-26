@@ -41,6 +41,7 @@ from htr2hpc.train.calculate import (
     estimate_duration,
     estimate_cpu_mem,
 )
+from htr2hpc.train.slurm_jobstats import SlurmJobStats
 
 
 api_token_env_var = "ESCRIPTORIUM_API_TOKEN"
@@ -82,7 +83,7 @@ class TrainingManager:
     model_file: pathlib.Path = None
     training_data_counts: Optional[dict] = None
     slurm_output: str = ""
-    job_stats: str = ""
+    job_stats: SlurmJobStats = ""
 
     def __post_init__(self):
         if self.update and not self.model_id:
@@ -197,16 +198,16 @@ class TrainingManager:
             job_output = self.work_dir / f"train_{job_id}.out"
         print(f"Job output is in {job_output}")
 
-        if self.task_report_id is not None:
-            try:
-                with open(job_output) as job_output_file:
-                    self.slurm_output = job_output_file.read()
-            except FileNotFoundError:
-                print(f"File {job_output} not found.")
-                self.slurm_output = ""
+        try:
+            with open(job_output) as job_output_file:
+                self.slurm_output = job_output_file.read()
+        except FileNotFoundError:
+            print(f"File {job_output} not found.")
+            self.slurm_output = ""
 
-            self.job_stats = slurm_job_stats(job_id)
-            
+        self.job_stats = slurm_job_stats(job_id)
+
+        if self.task_report_id is not None:
             # get current task report so we can add to messages
             task_report = self.api.task_details(self.task_report_id)
             self.api.task_update(
@@ -215,7 +216,6 @@ class TrainingManager:
                 task_report.user,
                 f"{task_report.messages}\n\n{'='*80}\nSlurm job output:\n{self.slurm_output}\n\n{self.job_stats}\n{'='*80}",
             )
-
         # when cancelled via delete button on mydella web ui,
         # statuses are COMPLETED,CANCELLED
         # if time limit ran out, status will include TIMEOUT as well as CANCELLED

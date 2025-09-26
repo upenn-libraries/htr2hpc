@@ -1,14 +1,12 @@
-import csv
 import datetime
-import json
 import logging
 import pathlib
 import subprocess
-from io import StringIO
 
 from simple_slurm import Slurm
 
 from htr2hpc.train.data import TrainingDataCounts
+from .slurm_jobstats import SlurmJobStats
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +30,7 @@ def segtrain(
         prelim_opt = "calibrate_"
     else:
         prelim_opt = ""
-        
+
     segtrain_slurm = Slurm(
         nodes=1,
         ntasks=1,
@@ -80,7 +78,7 @@ def recognition_train(
 ) -> int:
     """Run ketos recognition training as a slurm job.
     Returns the slurm job id for the queued job."""
-    
+
     # no epochs are passed for prelim train task.
     if not epochs:
         epochs = 50
@@ -157,12 +155,5 @@ def slurm_job_stats(job_id: int) -> str:
     """Use `sacct` to get Slurm Job Statistics and return as JSON string"""
     # PU CDH version uses jobstats, which is not available on Penn GPC2
     # grab all the sacct fields
-    result = subprocess.run(
-        ['sacct', f"--jobs={job_id}", "--format=ALL", "--parsable2"],
-        capture_output=True,
-        text=True,
-    )
+    return SlurmJobStats(job_id=job_id)
 
-    dr = csv.DictReader(StringIO(result.stdout), delimiter="|")
-
-    return json.dumps(list(dr), indent=2)
