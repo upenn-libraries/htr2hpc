@@ -343,7 +343,7 @@ class TrainingManager:
                 abs_prelim_model_file,
                 self.num_workers,
                 mem_per_cpu = mem_per_cpu,
-                training_time = full_duration,
+                # training_time = full_duration,
                 epochs = epoch_request,
             )
             os.chdir(self.orig_working_dir)
