@@ -74,6 +74,7 @@ def recognition_train(
     mem_per_cpu: str = "2G",
     training_time: datetime.timedelta = datetime.timedelta(minutes=15),
     epochs: int = None,
+    normalization: str = "NFD",
     # optional param to specify name based on document? include date?
 ) -> int:
     """Run ketos recognition training as a slurm job.
@@ -108,6 +109,7 @@ def recognition_train(
     input_model_opt = f"--resize new -i {input_model}" if input_model else ""
     recogtrain_cmd = (
         f"ketos train --min-epochs {epochs} {input_model_opt}"
+        + f" --normalization {normalization}"
         + f" -o {output_model} --workers {num_workers} -d cuda:0 "
         + f"-f binary {input_data_dir}/train.arrow "
         + f"-w 0 -s '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do.1,2 Lbx200 Do]' -r 0.0001"
