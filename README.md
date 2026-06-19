@@ -18,7 +18,7 @@ The project goal is integrating the [eScriptorium handwritten text recognition (
 This package can be installed directly from GitHub using `pip`:
 
 ```console
-pip install git+https://github.com/Princeton-CDH/htr2hpc.git@main#egg=htr2hpc
+pip install git+https://github.com/upenn-libraries/htr2hpc.git@main#egg=htr2hpc
 ```
 
 [`pucas`](https://github.com/Princeton-CDH/django-pucas) is a dependency of this package and will be included when you install this package.

@@ -1,6 +1,6 @@
 # How to use `htr2hpc.train`
 
-This submodule provides fucntionality for running HTR segmentation and transcription model training and fine-tuning tasks on an HPC system using content and models downloaded from an eScriptorium instance.
+This submodule provides functionality for running HTR segmentation and transcription model training and fine-tuning tasks on an HPC system using content and models downloaded from an eScriptorium instance.
 
 The `htr2hpc-train` script will download document parts and optionally a model file and then start a slurm job to run the appropriate training task.
 
@@ -9,18 +9,24 @@ The `htr2hpc-train` script will download document parts and optionally a model f
 On the HPC system (i.e., della for Princeton), download kraken and use their provided conda files to create a new python 3.11 conda environment named `htr2hpc`, and install the current version of this software:
 
 ```sh
-module load anaconda3/2024.2
+# module load anaconda3/2024.2
+module load miniforge3/24.11.3 # Penn SAS GPC2 provides conda via miniforge3
 git clone https://github.com/mittagessen/kraken.git
 cd kraken
+git checkout tags/5.2.9 # DE: Needed for torch v2.1.0 and environment file; kraken>=5.3 uses torch >=2.4
 conda env create -f environment_cuda.yml -n htr2hpc
+conda init
+# log out and log back in; then
 conda activate htr2hpc
 pip install torchvision torch==2.1 torchaudio==2.1
-pip install git+https://github.com/Princeton-CDH/htr2hpc.git@develop#egg=htr2hpc
+pip install git+https://github.com/upenn-libraries/htr2hpc.git@upenn-rework#egg=htr2hpc
+# you may need to install django; adjust version if needed
+pip install django==5.0.7
 ```
 
 To tinker with htr2hpc settings, check out the code from github and install the local checkout as an editable installation:
 ```sh
-git clone https://github.com/Princeton-CDH/htr2hpc.git
+git clone https://github.com/upenn-libraries/htr2hpc.git
 cd htr2hpc
 git checkout develop
 pip install -e .

@@ -1,38 +1,39 @@
 from pathlib import Path
 
-from escriptorium.settings import INSTALLED_APPS, TEMPLATES, LOGIN_REDIRECT_URL
+from escriptorium.settings import INSTALLED_APPS, TEMPLATES
 
 # base directory for this package where it is installed
 HTR2HPC_INSTALL_DIR = Path(__file__).parent
 
 
-INSTALLED_APPS += ["django_cas_ng", "pucas", "htr2hpc"]
-AUTHENTICATION_BACKENDS = (
-    "django.contrib.auth.backends.ModelBackend",
-    "django_cas_ng.backends.CASBackend",
-)
+# INSTALLED_APPS += ["django_cas_ng", "pucas", "htr2hpc"]
+INSTALLED_APPS += ["htr2hpc"]
+# AUTHENTICATION_BACKENDS = (
+#     "django.contrib.auth.backends.ModelBackend",
+#     # "django_cas_ng.backends.CASBackend",
+# )
 
 
 # PUCAS configuration for CAS/LDAP login and user provisioning.
 # Only includes non-sensitive configurations that do not change
-PUCAS_LDAP = {
-    # basic user profile attributes
-    "ATTRIBUTES": ["givenName", "sn", "mail"],
-    "ATTRIBUTE_MAP": {
-        "first_name": "givenName",
-        "last_name": "sn",
-        "email": "mail",
-    },
-}
+# PUCAS_LDAP = {
+#     # basic user profile attributes
+#     "ATTRIBUTES": ["givenName", "sn", "mail"],
+#     "ATTRIBUTE_MAP": {
+#         "first_name": "givenName",
+#         "last_name": "sn",
+#         "email": "mail",
+#     },
+# }
 
 # default django-cas behavior is to redirect back to the referrer,
 # which puts you at the login page; redirect instead to escriptorium default,
 # which is currently configured as the projects list page
-CAS_REDIRECT_URL = LOGIN_REDIRECT_URL
-CAS_IGNORE_REFERER = True
+# CAS_REDIRECT_URL = LOGIN_REDIRECT_URL
+# CAS_IGNORE_REFERER = True
 
 # use local url config
-ROOT_URLCONF = "htr2hpc.urls"
+# ROOT_URLCONF = "htr2hpc.urls"
 
 # Insert local templates path first so it will take precedence
 TEMPLATES[0]["DIRS"].insert(0, HTR2HPC_INSTALL_DIR / "templates")
@@ -45,6 +46,5 @@ TEMPLATES[0]["DIRS"].insert(0, HTR2HPC_INSTALL_DIR / "templates")
 TEMPLATES[0]["OPTIONS"]["context_processors"].append(
     "htr2hpc.context_processors.vm_status"
 )
-
 
 CUSTOM_HOME = True

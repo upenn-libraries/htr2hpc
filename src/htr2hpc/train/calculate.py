@@ -2,6 +2,9 @@ import re
 import math
 import datetime
 
+from .slurm_jobstats import SlurmJobStats
+
+
 def slurm_get_max_acc(slurm_output, training_mode):
     """Return a tuple of (epoch #, accuracy) for the epoch with highest accuracy"""
     if training_mode == "Segment":
@@ -37,29 +40,34 @@ def slurm_get_avg_epoch(slurm_output):
         return epoch_avg
     
 
-def stats_get_max_cpu(job_stats):
+def stats_get_max_cpu(job_stats: SlurmJobStats):
     """Return max CPU usage"""
-    mem_usage = re.findall('\(([\d.]+)([\w]+)\/[\d.]+[\w]+ per core', job_stats)
-    
-    if mem_usage:
-        gb_used = float(mem_usage[0][0])/1000 if mem_usage[0][1] == 'MB' else float(mem_usage[0][0])
-        return gb_used
+    # PU Della GPC has `jobstats`, which gives per-CPU usage stats. UPenn SAS does not
+    # we use sacct which returns total memory across all CPUs. SlurmJobStats
+    # returns the *average* mem per CPU
+    # mem_usage = re.findall('\(([\d.]+)([\w]+)\/[\d.]+[\w]+ per core', job_stats)
+    #
+    # if mem_usage:
+    #     gb_used = float(mem_usage[0][0]) / 1000 if mem_usage[0][1] == 'MB' else float(mem_usage[0][0])
+    #     return gb_used
+
+    return job_stats.mem_per_cpu()
 
 
-def calc_full_duration(slurm_output, job_stats):
+def calc_full_duration(slurm_output: str, job_stats: SlurmJobStats):
     """Given a preliminary slurm job output, return duration estimate:
     Setup time, plus N times the average epoch plus 10% for wiggle room.
     Assumes the train task will take 50 epochs. N = 50 - count of completed
     epochs from prelim train task.
     """
-    job_duration = re.findall('Run Time: (\d+:\d\d:\d\d)', job_stats)
+    # job_duration = re.findall('Run Time: (\d+:\d\d:\d\d)', job_stats)
     epoch_avg = slurm_get_avg_epoch(slurm_output)
     epoch_count = slurm_count_epoch(slurm_output)
     
-    if job_duration:
-        t = datetime.datetime.strptime(job_duration[0], '%H:%M:%S')
-        job_duration = datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second).seconds
-    
+    if job_stats.job_duration():
+        # t = datetime.datetime.strptime(job_duration[0], '%H:%M:%S')
+        # job_duration = datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second).seconds
+        job_duration = job_stats.job_duration()
         if epoch_avg:
             setup_time = job_duration - ( epoch_avg * epoch_count )
             
@@ -111,20 +119,20 @@ def estimate_cpu_mem(training_data_size, training_mode):
     
     if training_mode == "Segment":
         if training_data_size < 10000000:
-            mem_per_cpu = 1
-        elif training_data_size < 20000000:
             mem_per_cpu = 2
-        elif training_data_size < 40000000:
+        elif training_data_size < 20000000:
             mem_per_cpu = 3
-        elif training_data_size < 120000000:
+        elif training_data_size < 40000000:
             mem_per_cpu = 4
-        elif training_data_size < 200000000:
+        elif training_data_size < 120000000:
             mem_per_cpu = 5
+        elif training_data_size < 200000000:
+            mem_per_cpu = 6
         else:
-            mem_per_cpu = 6 + (training_data_size - 200000000) // 100000000
+            mem_per_cpu = 7 + (training_data_size - 200000000) // 100000000
     else:
         mem_per_cpu = 1 if training_data_size < 50000000 else 2
-        
+
     return f"{mem_per_cpu}G"
 
         

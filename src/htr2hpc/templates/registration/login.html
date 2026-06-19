@@ -2,10 +2,6 @@
 {# copy of escriptorium registration/login.html with pucas style and include added #}
 {% load i18n static %}
 
-{% block extrastyle %}
-  <link type="text/css" rel="stylesheet" href="{% static 'pucas/pu-login.css' %}"/>
-{% endblock %}
-
 
 {% block menu %}
 {% endblock %}
@@ -18,16 +14,6 @@
 
       <div class="login-panel panel panel-default">
         <div class="panel-body">
-          {% include 'pucas/pu-cas-login.html' %}
-        </div>
-      </div>
-
-      <div class="login-panel panel panel-default">
-        <div class="panel-body">
-
-
-
-
 
           {% if form.errors %}
           <p>{% trans "Your username and password didn't match. Please try again." %}</p>

@@ -44,7 +44,7 @@ fi
 
 # create conda environment named htr2hpc
 conda_env_name=htr2hpc
-module load anaconda3/2024.2
+module load miniforge3/24.11.3
 if { conda env list | grep $conda_env_name; } >/dev/null 2>&1; then
 	echo "conda env $conda_env_name already exists"
 

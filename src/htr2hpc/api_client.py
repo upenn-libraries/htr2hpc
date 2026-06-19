@@ -351,7 +351,7 @@ class eScriptoriumAPIClient:
                 # NOTE: this requires a customization to the eScriptorium api,
                 # which exposes the underlying training accuracy field
                 # as a read-write model attribute
-                "training_accuracy": self.get_model_accuracy(model_file),
+                "training_accuracy": get_model_accuracy(model_file),
             }
             resp = self._make_request(
                 api_url,

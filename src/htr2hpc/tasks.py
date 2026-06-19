@@ -33,8 +33,9 @@ def start_remote_training(
 ):
     # common logic for segtrain and train to kick off remote training script
 
-    # assume we're using LDAP accounts only so usernames match here and on hpc
-    username = user.username
+    # Use the HPC_SSH_USER if provided; otherwise, assume HPC user is logged-in
+    # user
+    username = settings.HPC_SSH_USER or user.username
     api_token = user.auth_token.key
 
     # hostname and ssh key path set in django config
@@ -65,8 +66,9 @@ def start_remote_training(
             )
 
             with conn.cd(working_dir):
+                # NOTE: SAS GPC2 requires the login env for the module command; we have to run 'bash -l -c "..."'
                 result = conn.run(
-                    f"module load anaconda3/2024.6 && conda run -n htr2hpc {train_cmd}",
+                    f'bash -l -c "module load miniforge3/24.11.3 && conda run -n htr2hpc {train_cmd}"',
                     env={"ESCRIPTORIUM_API_TOKEN": api_token},
                     warn=True,  # don't throw unexpected error on exit != 0
                 )
@@ -190,7 +192,10 @@ def segtrain(
     )
 
     # create a name for an output directory based on mode and document id
-    working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"
+    # TODO: change for SAS GPC fs
+    # working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"
+    working_dir = settings.HPC_WORKING_DIR if settings.HPC_WORKING_DIR else "${HOME}/htr2hpc"
+    workers = settings.KETOS_WORKERS if settings.KETOS_WORKERS else 8
     # includes a timestamp to ensure uniqueness, since
     # script will fail if there is an existing directory
     outdir = f"segtrain_doc{document_pk}_{directory_timestamp()}"
@@ -205,7 +210,12 @@ def segtrain(
         f"--document {document_pk}",  # document id is always required
         "--no-progress",  # disable progressbar
         f"--task-report {task_report.pk}",  # task reporting
+        f"--workers {workers}",  # number of ketos workers
     ]
+
+    if logger.level <= logging.DEBUG:
+        arg_options.append("--log-level DEBUG")
+        arg_options.append("--no-clean")
 
     # part ids are optional
     if part_pks:
@@ -319,7 +329,7 @@ def train(
         return
 
     # create a name for an output directory based on mode and document id
-    working_dir = f"/scratch/gpfs/{user.username}/htr2hpc"
+    working_dir = settings.HPC_WORKING_DIR if settings.HPC_WORKING_DIR else "${HOME}/htr2hpc"
     # create a name for an output directory based on mode and transcripiton id
     # include a timestamp to ensure uniqueness, since
     # script will fail if there is an existing directory
@@ -362,6 +372,7 @@ def train(
 
     site = Site.objects.get(pk=settings.SITE_ID)
     site_url = site.domain
+
     if not site_url.startswith("http"):
         site_url = f"https://{site_url}"
 
@@ -377,6 +388,10 @@ def train(
         "--no-progress",  # disable progressbar
         f"--task-report {task_report.pk}",  # task reporting
     ]
+
+    if logger.level <= logging.DEBUG:
+        arg_options.append("--log-level DEBUG")
+        arg_options.append("--no-clean")
 
     # model is technically optional for this task but it should
     # always be passed in by escriptorium calling code

@@ -1,0 +1,139 @@
+version: "3.9"
+
+x-app:
+  &app
+  image: htr2hpc:${HTR2HPC_IMAGE_TAG:-latest}
+  pull_policy: never
+  volumes:
+    - static:/usr/src/app/static
+    - media:/usr/src/app/media
+    - ssh:/usr/src/app/.ssh
+  command: /bin/true
+  environment:
+    - CSRF_TRUSTED_ORIGINS
+    - DEBUG
+    - DJANGO_FROM_EMAIL
+    - DJANGO_SETTINGS_MODULE
+    - DJANGO_SU_EMAIL
+    - DJANGO_SU_NAME
+    - DJANGO_SU_PASSWORD
+    - DOMAIN
+    - EMAIL_HOST
+    - EMAIL_SUBJECT_PREFIX
+    - ESCRIPTORIUM_HOST
+    - FLOWER_BASIC_AUTH
+    - HPC_HOSTNAME
+    - HPC_SSH_KEYFILE
+    - HPC_SSH_USER
+    - HPC_WORKING_DIR
+    - IIIF_IMPORT_QUALITY
+    - KETOS_WORKERS
+    - POSTGRES_DB
+    - POSTGRES_PASSWORD
+    - POSTGRES_USER
+    - REDIS_HOST
+    - REDIS_PORT
+    - SECRET_KEY
+    - SERVER_EMAIL
+    - SITE_NAME
+    - SQL_HOST
+    - SQL_PORT
+    - USE_X_FORWARDED_HOST
+  networks:
+    - escriptorium
+
+services:
+
+  web:
+    <<: *app
+    restart: always
+    command: uwsgi --ini /usr/src/app/uwsgi.ini
+    ports:
+      - "8899:8899"
+
+  channelserver:
+    <<: *app
+    restart: always
+    command: daphne --bind 0.0.0.0 --port 5000 -v 3 escriptorium.asgi:application
+
+  db:
+    image: docker.io/library/postgres:15
+    restart: always
+    volumes:
+      - postgres:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+    networks:
+      - escriptorium
+
+  redis:
+    image: "docker.io/redis:alpine"
+    restart: always
+    networks:
+      - escriptorium
+
+  nginx:
+    image: htr2hpc-nginx:${HTR2HPC_NGINX_IMAGE_TAG:-latest}
+    pull_policy: never
+    restart: always
+    environment:
+      - SERVERNAME=${DOMAIN:-localhost}
+    volumes:
+      - static:/usr/src/app/static
+      - media:/usr/src/app/media
+    ports:
+      - "0.0.0.0:8080:80"
+    networks:
+      - escriptorium
+
+  celery-main:
+    <<: *app
+    restart: always
+    command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q default -c ${CELERY_MAIN_CONC:-10} --max-tasks-per-child=10"
+
+  celery-live:
+    <<: *app
+    restart: always
+    command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q live -c ${CELERY_LIVE_CONC:-10} --max-tasks-per-child=10"
+
+  celery-low-priority:
+    <<: *app
+    restart: always
+    command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q low-priority -c ${CELERY_LOW_CONC:-10} --max-tasks-per-child=10"
+
+  celery-gpu: &celery-gpu
+    <<: *app
+    restart: always
+    environment:
+      - KRAKEN_TRAINING_DEVICE=cpu
+    command: "celery -A escriptorium worker -l INFO -E -Ofair --prefetch-multiplier 1 -Q gpu -c 1 --max-tasks-per-child=1"
+
+  flower:
+    image: docker.io/mher/flower
+    restart: always
+    command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
+    ports:
+      - "5555:5555"
+    networks:
+      - escriptorium
+
+  mail:
+    image: registry.gitlab.com/scripta/escriptorium/mail
+    environment:
+      - PRIMARY_HOST=${DOMAIN:-localhost}
+      - ALLOWED_HOSTS=web ; celery-main ; celery-low-priority; docker0
+    networks:
+      - escriptorium
+
+volumes:
+   static:
+   media:
+   postgres:
+   esdata:
+   ssh:
+
+networks:
+  escriptorium:
+    name: escriptorium

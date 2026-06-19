@@ -6,6 +6,7 @@ import subprocess
 from simple_slurm import Slurm
 
 from htr2hpc.train.data import TrainingDataCounts
+from .slurm_jobstats import SlurmJobStats
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ def segtrain(
         prelim_opt = "calibrate_"
     else:
         prelim_opt = ""
-        
+
     segtrain_slurm = Slurm(
         nodes=1,
         ntasks=1,
@@ -39,6 +40,8 @@ def segtrain(
         job_name=f"{prelim_opt}segtrain:{output_model.name}",
         output=f"segtrain_{Slurm.JOB_ARRAY_MASTER_ID}.out",
         time=training_time,
+        partition="low_gpu_a40",
+        qos="low",
     )
     # do we want to use CUDA Multi-Process Service (MPS) ?
     # della documentation says to specify with --gpu-mps,
@@ -48,7 +51,7 @@ def segtrain(
 
     # add commands for setup steps
     segtrain_slurm.add_cmd("module purge")
-    segtrain_slurm.add_cmd("module load anaconda3/2024.2")
+    segtrain_slurm.add_cmd("module load miniforge3/24.11.3")
     segtrain_slurm.add_cmd("conda activate htr2hpc")
     logger.info(f"sbatch file\n: {segtrain_slurm}")
     # sbatch returns the job id for the created job
@@ -71,11 +74,12 @@ def recognition_train(
     mem_per_cpu: str = "2G",
     training_time: datetime.timedelta = datetime.timedelta(minutes=15),
     epochs: int = None,
+    normalization: str = "NFD",
     # optional param to specify name based on document? include date?
 ) -> int:
     """Run ketos recognition training as a slurm job.
     Returns the slurm job id for the queued job."""
-    
+
     # no epochs are passed for prelim train task.
     if not epochs:
         epochs = 50
@@ -92,9 +96,11 @@ def recognition_train(
         job_name=f"{prelim_opt}train:{output_model.name}",
         output=f"train_{Slurm.JOB_ARRAY_MASTER_ID}.out",
         time=training_time,
+        partition="low_gpu_a40",
+        qos="low",
     )
     recogtrain_slurm.add_cmd("module purge")
-    recogtrain_slurm.add_cmd("module load anaconda3/2024.2")
+    recogtrain_slurm.add_cmd("module load miniforge3/24.11.3")
     recogtrain_slurm.add_cmd("conda activate htr2hpc")
     logger.info(f"sbatch file\n: {recogtrain_slurm}")
     # sbatch returns the job id for the created job
@@ -103,6 +109,7 @@ def recognition_train(
     input_model_opt = f"--resize new -i {input_model}" if input_model else ""
     recogtrain_cmd = (
         f"ketos train --min-epochs {epochs} {input_model_opt}"
+        + f" --normalization {normalization}"
         + f" -o {output_model} --workers {num_workers} -d cuda:0 "
         + f"-f binary {input_data_dir}/train.arrow "
         + f"-w 0 -s '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do.1,2 Lbx200 Do]' -r 0.0001"
@@ -118,7 +125,7 @@ def slurm_job_queue_status(job_id: int) -> str:
     """Use `squeue` to get the full-word status (i.e., PENDING or RUNNING)
     for a queued slurm job."""
     result = subprocess.run(
-        ["squeue", f"--jobs={job_id}", "--only-job-state", "--format=%T", "--noheader"],
+        ["squeue", f"--jobs={job_id}", "--format=%T", "--noheader"],
         capture_output=True,
         text=True,
     )
@@ -144,13 +151,11 @@ def slurm_job_status(job_id: int) -> set:
     # sacct returns a table with status for each portion of the job;
     # return all unique status codes for now
     return set(result.stdout.split())
-    
+
+
 def slurm_job_stats(job_id: int) -> str:
-    """Use `jobstats` to get Slurm Job Statistics, to track resource usage"""
-    result = subprocess.run(
-        ["jobstats", str(job_id)],
-        capture_output=True,
-        text=True,
-    )
-    # return task status without any whitespace
-    return result.stdout.strip()
+    """Use `sacct` to get Slurm Job Statistics and return as JSON string"""
+    # PU CDH version uses jobstats, which is not available on Penn GPC2
+    # grab all the sacct fields
+    return SlurmJobStats(job_id=job_id)
+

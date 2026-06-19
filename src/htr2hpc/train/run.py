@@ -41,6 +41,7 @@ from htr2hpc.train.calculate import (
     estimate_duration,
     estimate_cpu_mem,
 )
+from htr2hpc.train.slurm_jobstats import SlurmJobStats
 
 
 api_token_env_var = "ESCRIPTORIUM_API_TOKEN"
@@ -82,7 +83,7 @@ class TrainingManager:
     model_file: pathlib.Path = None
     training_data_counts: Optional[dict] = None
     slurm_output: str = ""
-    job_stats: str = ""
+    job_stats: SlurmJobStats = ""
 
     def __post_init__(self):
         if self.update and not self.model_id:
@@ -197,16 +198,16 @@ class TrainingManager:
             job_output = self.work_dir / f"train_{job_id}.out"
         print(f"Job output is in {job_output}")
 
-        if self.task_report_id is not None:
-            try:
-                with open(job_output) as job_output_file:
-                    self.slurm_output = job_output_file.read()
-            except FileNotFoundError:
-                print(f"File {job_output} not found.")
-                self.slurm_output = ""
+        try:
+            with open(job_output) as job_output_file:
+                self.slurm_output = job_output_file.read()
+        except FileNotFoundError:
+            print(f"File {job_output} not found.")
+            self.slurm_output = ""
 
-            self.job_stats = slurm_job_stats(job_id)
-            
+        self.job_stats = slurm_job_stats(job_id)
+
+        if self.task_report_id is not None:
             # get current task report so we can add to messages
             task_report = self.api.task_details(self.task_report_id)
             self.api.task_update(
@@ -215,7 +216,6 @@ class TrainingManager:
                 task_report.user,
                 f"{task_report.messages}\n\n{'='*80}\nSlurm job output:\n{self.slurm_output}\n\n{self.job_stats}\n{'='*80}",
             )
-
         # when cancelled via delete button on mydella web ui,
         # statuses are COMPLETED,CANCELLED
         # if time limit ran out, status will include TIMEOUT as well as CANCELLED
@@ -343,7 +343,7 @@ class TrainingManager:
                 abs_prelim_model_file,
                 self.num_workers,
                 mem_per_cpu = mem_per_cpu,
-                training_time = full_duration,
+                # training_time = full_duration,
                 epochs = epoch_request,
             )
             os.chdir(self.orig_working_dir)
@@ -377,20 +377,21 @@ class TrainingManager:
             msg = "Encountered errors. Ending script..."
         else:
             msg = "Submitting next slurm job..."
-        
-        task_report = self.api.task_details(self.task_report_id)
-        self.api.task_update(
-            self.task_report_id,
-            task_report.label,
-            task_report.user,
-            f"""{task_report.messages}
-            
-            Preliminary train task to calibrate requirements completed.
-            - The recommended mem per cpu is {mem_per_cpu}
-            - The recommended duration time is {full_duration} for {epoch_request} epochs.
-            - The prelim epoch with the highest accuracy was {best_epoch} with {best_acc}.
-            {msg}""",
-        )
+
+        if self.task_report_id:
+            task_report = self.api.task_details(self.task_report_id)
+            self.api.task_update(
+                self.task_report_id,
+                task_report.label,
+                task_report.user,
+                f"""{task_report.messages}
+
+                Preliminary train task to calibrate requirements completed.
+                - The recommended mem per cpu is {mem_per_cpu}
+                - The recommended duration time is {full_duration} for {epoch_request} epochs.
+                - The prelim epoch with the highest accuracy was {best_epoch} with {best_acc}.
+                {msg}""",
+            )
         return abs_prelim_model_file, full_duration, mem_per_cpu, epoch_request
     
 
@@ -571,6 +572,13 @@ def main():
         default=8,
         dest="num_workers",
     )
+    parser.add_argument(
+        '--log-level',
+        dest='log_level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).'
+    )
+
     args = parser.parse_args()
     # validate argument combinations
 
@@ -608,9 +616,10 @@ def main():
     if not args.existing_data:
         args.work_dir.mkdir()
 
-    logging.basicConfig(encoding="utf-8", level=logging.WARN)
+    loglevel = args.log_level.upper() if args.log_level else None
+    logging.basicConfig(encoding="utf-8", level=(loglevel or logging.WARN))
     logger_local = logging.getLogger("htr2hpc")
-    logger_local.setLevel(logging.INFO)
+    logger_local.setLevel((loglevel or logging.INFO))
     # output kraken logging details to confirm binary data looks ok
     logger_kraken = logging.getLogger("kraken")
     # logger_kraken.setLevel(logging.INFO)
@@ -620,6 +629,7 @@ def main():
     arg_options = dict(vars(args))
     del arg_options["clean"]
     del arg_options["mode"]  # converted to training_mode (Segment/Recognize)
+    del arg_options["log_level"]
 
     # initialize training manager
     try:
