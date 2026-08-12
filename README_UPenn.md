@@ -26,14 +26,14 @@ eScriptorium → HTR2HPC Tasks → SSH Connection → GPC2 Cluster
 
 ### Configuration Changes
 
-| Component | Change | Reason |
-|-----------|--------|---------|
-| GitHub Repository | Updated to `upenn-libraries/htr2hpc` | Fork maintenance |
-| Module Loading | Changed from `anaconda3` to `miniforge3/24.11.3` | GPC2 environment |
-| Working Directory | Uses `${HOME}/htr2hpc` instead of `/scratch/gpfs/{user.username}/htr2hpc` | GPC2 filesystem limitations |
-| SSH Authentication | Single shared HPC account via `HPC_SSH_USER` | Simplified user management |
-| Slurm Parameters | Added `--qos` and `--partition` requirements | GPC2 cluster requirements |
-| Job Statistics | Uses `sacct` instead of `jobstats` | Tool availability |
+| Component          | Change                                                                    | Reason                      |
+|--------------------|---------------------------------------------------------------------------|-----------------------------|
+| GitHub Repository  | Updated to `upenn-libraries/htr2hpc`                                      | Fork maintenance            |
+| Module Loading     | Changed from `anaconda3` to `miniforge3/24.11.3`                          | GPC2 environment            |
+| Working Directory  | Uses `${HOME}/htr2hpc` instead of `/scratch/gpfs/{user.username}/htr2hpc` | GPC2 filesystem limitations |
+| SSH Authentication | Single shared HPC account via `HPC_SSH_USER`                              | Simplified user management  |
+| Slurm Parameters   | Added `--qos` and `--partition` requirements                              | GPC2 cluster requirements   |
+| Job Statistics     | Uses `sacct` instead of `jobstats`                                        | Tool availability           |
 
 ### Code Modifications
 
@@ -67,9 +67,9 @@ result = conn.run(
 
 ### Cluster Comparison
 
-| Filesystem | Della (Princeton) | GPC2 (UPenn) |
-|------------|-------------------|---------------|
-| `/home` | Head node only | All nodes |
+| Filesystem | Della (Princeton)     | GPC2 (UPenn)                 |
+|------------|-----------------------|------------------------------|
+| `/home`    | Head node only        | All nodes                    |
 | `/scratch` | All nodes, persistent | Compute nodes only, per-node |
 
 ### Why We Use `/home` on GPC2
