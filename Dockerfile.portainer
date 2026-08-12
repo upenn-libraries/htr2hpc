@@ -5,14 +5,14 @@ RUN apk update && apk add git
 ENV ESCRIPTORIUM_SRC=/escriptorium-src
 RUN git clone https://gitlab.com/scripta/escriptorium.git ${ESCRIPTORIUM_SRC} && \
     cd ${ESCRIPTORIUM_SRC} && \
-    git checkout tags/dev-0.14.2
+    git checkout tags/v1.0.1
 
 RUN cp -r ${ESCRIPTORIUM_SRC}/front /build
 WORKDIR /build
 RUN npm ci && npm run production
 
 # Pull official base image
-FROM registry.gitlab.com/scripta/escriptorium/base:kraken529 AS escriptorium
+FROM registry.gitlab.com/scripta/escriptorium:v1.0.1 AS escriptorium AS escriptorium
 
 # try to autodetect number of cpus available
 # ENV NGINX_WORKER_PROCESSES auto
